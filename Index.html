@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <?!= include('Styles'); ?>
+  </head>
+  <body>
+    <div class="app-shell">
+      <div class="hero">
+        <div class="hero-row">
+          <div>
+            <h1 id="appTitle"><?= appTitle ?></h1>
+            <p>Choose a species, complete your mission, and generate your final rescue poster.</p>
+          </div>
+          <button id="emergencySubmitBtn" class="btn btn-emergency hidden" type="button">Emergency Submit</button>
+        </div>
+
+        <div class="progress-wrap">
+          <div class="progress-label" id="progressText">Progress: 0%</div>
+          <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="statusBox" class="status-banner hidden"></div>
+      <div id="busyMessage" class="panel hidden subtle">Loading...</div>
+
+      <section id="missionReference" class="panel hidden">
+        <div class="reference-row">
+          <div>
+            <div class="reference-title" id="referenceSpeciesName">Mission Reference</div>
+            <div class="subtle" id="referenceSpeciesMeta"></div>
+          </div>
+          <div id="referenceLinks" class="link-list"></div>
+        </div>
+      </section>
+
+      <section id="stage-login" class="panel">
+        <h2 class="section-title">Start Mission</h2>
+        <p class="subtle">Enter your information to begin.</p>
+
+        <div class="grid-2">
+          <div class="field">
+            <label for="firstName">First Name</label>
+            <input id="firstName" type="text" placeholder="Enter first name">
+          </div>
+
+          <div class="field">
+            <label for="lastName">Last Name</label>
+            <input id="lastName" type="text" placeholder="Enter last name">
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button id="startMissionBtn" class="btn btn-primary" type="button">Start Mission</button>
+        </div>
+      </section>
+
+      <section id="stage-species" class="panel hidden">
+        <h2 class="section-title">Choose Your Species</h2>
+        <p class="subtle">Pick one organism to research and protect.</p>
+        <div id="speciesGrid" class="species-grid"></div>
+      </section>
+
+      <section id="stage-briefing" class="panel hidden">
+        <h2 class="section-title">Mission Briefing</h2>
+
+        <div class="briefing-box">
+          <div class="pill"><em id="briefingScientificName"></em></div>
+          <div class="pill" id="briefingBiome">Biome</div>
+          <div class="pill" id="briefingRegion">Region</div>
+
+          <p id="briefingText" class="briefing-text"></p>
+          <div id="briefingLinks" class="link-list"></div>
+        </div>
+
+        <div class="btn-row">
+          <button id="briefingContinueBtn" class="btn btn-primary" type="button">Continue</button>
+        </div>
+      </section>
+
+      <section id="stage-ecology" class="panel hidden">
+        <h2 class="section-title">Gather Ecological Evidence</h2>
+        <p class="subtle">Use your research to describe the species and how it survives.</p>
+
+        <div class="grid-2">
+          <div class="field">
+            <label for="commonNameAnswer">Common Name</label>
+            <input id="commonNameAnswer" type="text" placeholder="Type the common name of your organism">
+          </div>
+
+          <div class="field">
+            <label for="statusAnswer">Conservation Classification</label>
+            <select id="statusAnswer"></select>
+          </div>
+
+          <div class="field">
+            <label for="habitatType">Habitat Type</label>
+            <select id="habitatType"></select>
+          </div>
+
+          <div class="field">
+            <label for="dietType">Diet Type</label>
+            <select id="dietType"></select>
+          </div>
+
+          <div class="field">
+            <label for="adaptationType">Key Adaptation</label>
+            <input id="adaptationType" type="text" placeholder="Example: camouflage, strong shell, fast speed">
+          </div>
+
+          <div class="field">
+            <label for="ecosystemRole">Ecosystem Role</label>
+            <input id="ecosystemRole" type="text" placeholder="Example: predator, prey, pollinator, seed disperser">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="ecologyExplanation">Ecological Explanation — Explain what habitat it lives in, what it eats, and how it survives there.</label>
+          <textarea id="ecologyExplanation" placeholder="Explain what habitat it lives in, what it eats, and how it survives there."></textarea>
+        </div>
+
+        <div class="btn-row">
+          <button id="saveEcologyBtn" class="btn btn-primary" type="button">Save and Continue</button>
+        </div>
+      </section>
+
+      <section id="stage-threats" class="panel hidden">
+        <h2 class="section-title">Diagnose 3 Threats</h2>
+        <p class="subtle">Choose three different threats and explain each one.</p>
+
+        <div class="threat-grid">
+          <div class="sub-panel">
+            <div class="field">
+              <label for="threat1">Threat 1</label>
+              <select id="threat1"></select>
+            </div>
+            <div class="field">
+              <label for="threat1Reason">Why is this a threat?</label>
+              <textarea id="threat1Reason"></textarea>
+            </div>
+          </div>
+
+          <div class="sub-panel">
+            <div class="field">
+              <label for="threat2">Threat 2</label>
+              <select id="threat2"></select>
+            </div>
+            <div class="field">
+              <label for="threat2Reason">Why is this a threat?</label>
+              <textarea id="threat2Reason"></textarea>
+            </div>
+          </div>
+
+          <div class="sub-panel">
+            <div class="field">
+              <label for="threat3">Threat 3</label>
+              <select id="threat3"></select>
+            </div>
+            <div class="field">
+              <label for="threat3Reason">Why is this a threat?</label>
+              <textarea id="threat3Reason"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button id="saveThreatsBtn" class="btn btn-primary" type="button">Save and Continue</button>
+        </div>
+      </section>
+
+      <section id="stage-actions" class="panel hidden">
+        <h2 class="section-title">Choose 2 or 3 Conservation Actions</h2>
+        <p class="subtle">Choose at least two different actions and explain how they could help.</p>
+
+        <div class="grid-2">
+          <div class="field">
+            <label for="action1">Action 1</label>
+            <select id="action1"></select>
+          </div>
+
+          <div class="field">
+            <label for="action2">Action 2</label>
+            <select id="action2"></select>
+          </div>
+
+          <div class="field">
+            <label for="action3">Action 3</label>
+            <select id="action3"></select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="actionExplanation">How do these actions help?</label>
+          <textarea id="actionExplanation" placeholder="Ex. Breeding facilities would help by increasing the population and protecting young animals until they are strong enough to survive."></textarea>
+        </div>
+
+        <div class="btn-row">
+          <button id="saveActionsBtn" class="btn btn-primary" type="button">Save and Continue</button>
+        </div>
+      </section>
+
+      <section id="stage-final" class="panel hidden">
+        <h2 class="section-title">Final Pitch + Poster Image</h2>
+        <p class="subtle">Finish your mission and generate your poster.</p>
+
+        <div class="field">
+          <label for="whyItMatters">Why does this species matter?</label>
+          <textarea id="whyItMatters" placeholder="Why should people care about protecting this species?"></textarea>
+        </div>
+
+        <h3 class="section-title section-title-small">Choose Your Poster Image</h3>
+        <div id="imageChoiceGrid" class="image-choice-grid"></div>
+
+        <div class="btn-row">
+          <button id="finishMissionBtn" class="btn btn-primary" type="button">Finish Mission</button>
+        </div>
+      </section>
+
+      <section id="stage-submitted" class="panel hidden">
+        <h2 class="section-title">Submission Complete</h2>
+        <p id="submittedMessage">Your rescue poster has been generated and saved.</p>
+
+        <div id="submittedLinks" class="btn-row hidden">
+          <a id="completeSlideLink" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">View Slide</a>
+          <a id="completePdfLink" class="btn btn-primary" target="_blank" rel="noopener noreferrer">Open PDF</a>
+        </div>
+      </section>
+    </div>
+
+    <div id="submitModal" class="modal hidden">
+      <div class="modal-card">
+        <h3 id="submitModalTitle">Submit?</h3>
+        <p id="submitModalText" class="subtle"></p>
+        <div class="btn-row">
+          <button id="submitModalCancelBtn" class="btn btn-secondary" type="button">Cancel</button>
+          <button id="submitModalConfirmBtn" class="btn btn-emergency" type="button">Submit Now</button>
+        </div>
+      </div>
+    </div>
+
+    <?!= include('ClientJavaScript'); ?>
+  </body>
+</html>
