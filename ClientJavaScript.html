@@ -1,11 +1,10 @@
 <script>
-  var STORAGE_KEY = 'esrm_v11_draft';
+  var STORAGE_KEY = 'esrm_v12_draft';
 
   var state = {
     config: null,
     studentKey: '',
     selectedSpecies: null,
-    selectedImageUrl: '',
     currentStage: 'login',
     generatingPoster: false,
     submitMode: ''
@@ -40,8 +39,8 @@
       'firstName', 'lastName',
       'commonNameAnswer', 'statusAnswer',
       'habitatType', 'dietType', 'adaptationType', 'ecosystemRole', 'ecologyExplanation',
-      'threat1', 'threat1Reason', 'threat2', 'threat2Reason', 'threat3', 'threat3Reason',
-      'action1', 'action2', 'action3', 'actionExplanation',
+      'threat1', 'threat1Reason', 'threat2', 'threat2Reason',
+      'action1', 'action2', 'actionExplanation',
       'whyItMatters'
     ];
 
@@ -85,11 +84,9 @@
     fillSelect('dietType', dropdowns.dietTypes);
     fillSelect('threat1', dropdowns.threats);
     fillSelect('threat2', dropdowns.threats);
-    fillSelect('threat3', dropdowns.threats);
 
     fillSelect('action1', dropdowns.actions);
     fillSelect('action2', dropdowns.actions);
-    fillSelect('action3', dropdowns.actions);
   }
 
   function fillSelect(id, values) {
@@ -325,22 +322,16 @@
       threat1: document.getElementById('threat1').value,
       threat1Reason: document.getElementById('threat1Reason').value.trim(),
       threat2: document.getElementById('threat2').value,
-      threat2Reason: document.getElementById('threat2Reason').value.trim(),
-      threat3: document.getElementById('threat3').value,
-      threat3Reason: document.getElementById('threat3Reason').value.trim()
+      threat2Reason: document.getElementById('threat2Reason').value.trim()
     };
 
-    if (
-      !payload.threat1 || !payload.threat1Reason ||
-      !payload.threat2 || !payload.threat2Reason ||
-      !payload.threat3 || !payload.threat3Reason
-    ) {
-      showError('Please choose 3 threats and explain each one.');
+    if (!payload.threat1 || !payload.threat1Reason || !payload.threat2 || !payload.threat2Reason) {
+      showError('Please choose 2 threats and explain each one.');
       return;
     }
 
-    if (uniqueLowerCount([payload.threat1, payload.threat2, payload.threat3]) !== 3) {
-      showError('Please choose 3 different threats.');
+    if (uniqueLowerCount([payload.threat1, payload.threat2]) !== 2) {
+      showError('Please choose 2 different threats.');
       return;
     }
 
@@ -363,29 +354,22 @@
     var payload = {
       action1: document.getElementById('action1').value,
       action2: document.getElementById('action2').value,
-      action3: document.getElementById('action3').value,
       actionExplanation: document.getElementById('actionExplanation').value.trim()
     };
 
-    var filledActions = [];
-    if (payload.action1) filledActions.push(payload.action1);
-    if (payload.action2) filledActions.push(payload.action2);
-    if (payload.action3) filledActions.push(payload.action3);
-
     if (!payload.action1 || !payload.action2 || !payload.actionExplanation) {
-      showError('Please choose at least 2 actions and explain how they help.');
+      showError('Please choose 2 actions and explain how they help.');
       return;
     }
 
-    if (uniqueLowerCount(filledActions) !== filledActions.length) {
-      showError('Please choose different conservation actions.');
+    if (uniqueLowerCount([payload.action1, payload.action2]) !== 2) {
+      showError('Please choose 2 different conservation actions.');
       return;
     }
 
     setBusy(true, 'saveActionsBtn');
     google.script.run
       .withSuccessHandler(function () {
-        renderImageChoices();
         showStage('final');
         persistDraftState();
         setBusy(false, 'saveActionsBtn');
@@ -395,101 +379,6 @@
       })
       .saveActions(state.studentKey, payload);
   }
-
-  function renderImageChoices() {
-    var grid = document.getElementById('imageChoiceGrid');
-    grid.innerHTML = '';
-    state.selectedImageUrl = state.selectedImageUrl || '';
-
-    if (!state.selectedSpecies) {
-      return;
-    }
-
-    var imageUrls = [
-      state.selectedSpecies.image_option_1_url,
-      state.selectedSpecies.image_option_2_url,
-      state.selectedSpecies.image_option_3_url
-    ];
-
-    var cleanUrls = [];
-    for (var i = 0; i < imageUrls.length; i++) {
-      if (imageUrls[i] && cleanUrls.indexOf(imageUrls[i]) === -1) {
-        cleanUrls.push(imageUrls[i]);
-      }
-    }
-
-    if (!cleanUrls.length) {
-      buildNoPhotoChoice(grid);
-      return;
-    }
-
-    for (var j = 0; j < cleanUrls.length; j++) {
-      buildImageChoiceCard(grid, cleanUrls[j]);
-    }
-
-    if (!state.selectedImageUrl && cleanUrls.length) {
-      state.selectedImageUrl = cleanUrls[0];
-      markSelectedImageChoice(grid, state.selectedImageUrl);
-    }
-  }
-
-  function buildImageChoiceCard(grid, url) {
-    var card = document.createElement('div');
-    card.className = 'image-choice';
-
-    card.addEventListener('click', function () {
-      state.selectedImageUrl = url;
-      markSelectedImageChoice(grid, state.selectedImageUrl);
-      persistDraftState();
-    });
-
-    var img = document.createElement('img');
-    img.alt = state.selectedSpecies.common_name;
-    img.referrerPolicy = 'no-referrer';
-    img.loading = 'eager';
-    img.onerror = function () {
-      card.innerHTML = '<div class="image-placeholder">Photo unavailable</div>';
-    };
-    img.src = url;
-
-    card.appendChild(img);
-    grid.appendChild(card);
-  }
-
-  function buildNoPhotoChoice(grid) {
-    var card = document.createElement('div');
-    card.className = 'image-choice selected';
-    card.innerHTML = '<div class="image-placeholder">No photo loaded for this species.<br>Continue without a poster photo.</div>';
-    card.addEventListener('click', function () {
-      state.selectedImageUrl = '';
-      markSelectedImageChoice(grid, state.selectedImageUrl);
-      persistDraftState();
-    });
-    grid.appendChild(card);
-    state.selectedImageUrl = '';
-  }
-
-  function markSelectedImageChoice(grid, selectedValue) {
-    var cards = grid.querySelectorAll('.image-choice');
-    for (var i = 0; i < cards.length; i++) {
-      cards[i].classList.remove('selected');
-    }
-
-    if (selectedValue === '') {
-      if (cards.length) {
-        cards[0].classList.add('selected');
-      }
-      return;
-    }
-
-    for (var j = 0; j < cards.length; j++) {
-      var img = cards[j].querySelector('img');
-      if (img && img.src === selectedValue) {
-        cards[j].classList.add('selected');
-      }
-    }
-  }
-
 
   function handleFinishMission() {
     clearStatus();
@@ -515,8 +404,7 @@
         handleErrorWithButton(error, 'finishMissionBtn');
       })
       .finishMission(state.studentKey, {
-        whyItMatters: whyItMatters,
-        selectedImageUrl: state.selectedImageUrl
+        whyItMatters: whyItMatters
       });
   }
 
@@ -663,7 +551,6 @@
     var draft = {
       studentKey: state.studentKey,
       selectedSpeciesId: state.selectedSpecies ? state.selectedSpecies.species_id : '',
-      selectedImageUrl: state.selectedImageUrl || '',
       currentStage: state.currentStage || 'login',
       fields: collectFieldValues()
     };
@@ -694,7 +581,6 @@
 
     applyFieldValues(draft.fields);
     state.studentKey = draft.studentKey || '';
-    state.selectedImageUrl = draft.selectedImageUrl || '';
     showEmergencyButton(!!state.studentKey);
 
     if (!draft.selectedSpeciesId) {
@@ -718,10 +604,6 @@
       return;
     }
 
-    if (draft.currentStage === 'final') {
-      renderImageChoices();
-    }
-
     if (stageOrder.indexOf(draft.currentStage) !== -1) {
       showStage(draft.currentStage);
     }
@@ -742,11 +624,8 @@
       threat1Reason: getValue('threat1Reason'),
       threat2: getValue('threat2'),
       threat2Reason: getValue('threat2Reason'),
-      threat3: getValue('threat3'),
-      threat3Reason: getValue('threat3Reason'),
       action1: getValue('action1'),
       action2: getValue('action2'),
-      action3: getValue('action3'),
       actionExplanation: getValue('actionExplanation'),
       whyItMatters: getValue('whyItMatters')
     };

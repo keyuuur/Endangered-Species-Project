@@ -191,9 +191,7 @@ function resetProjectSheetsDangerously() {
 }
 
 function getInitialConfig() {
-  setupProjectSheets();
   seedDefaultSpeciesMasterIfNeeded_();
-  patchMissingSpeciesImageData_();
 
   var settings = getSettingsMap_();
   var species = getSpeciesData_();
@@ -207,7 +205,6 @@ function getInitialConfig() {
 }
 
 function startMission(student) {
-  setupProjectSheets();
   validateRequired_(student, ['firstName', 'lastName']);
 
   var ss = getSpreadsheet_();
@@ -324,20 +321,14 @@ function saveThreats(studentKey, payload) {
   validateString_(studentKey, 'studentKey');
   validateRequired_(payload, [
     'threat1', 'threat1Reason',
-    'threat2', 'threat2Reason',
-    'threat3', 'threat3Reason'
+    'threat2', 'threat2Reason'
   ]);
 
-  var threatValues = [payload.threat1, payload.threat2, payload.threat3];
-  var normalizedThreats = {};
-  for (var i = 0; i < threatValues.length; i++) {
-    normalizedThreats[String(threatValues[i]).toLowerCase()] = true;
-  }
-  if (Object.keys(normalizedThreats).length !== 3) {
-    throw new Error('Please choose 3 different threats.');
+  if (trim_(payload.threat1).toLowerCase() === trim_(payload.threat2).toLowerCase()) {
+    throw new Error('Please choose 2 different threats.');
   }
 
-  var reasonKeys = ['threat1Reason', 'threat2Reason', 'threat3Reason'];
+  var reasonKeys = ['threat1Reason', 'threat2Reason'];
   for (var r = 0; r < reasonKeys.length; r++) {
     if (trim_(payload[reasonKeys[r]]).length < 5) {
       throw new Error('Each threat needs a short explanation.');
@@ -349,8 +340,6 @@ function saveThreats(studentKey, payload) {
     threat_1_reason: trim_(payload.threat1Reason),
     threat_2: payload.threat2,
     threat_2_reason: trim_(payload.threat2Reason),
-    threat_3: payload.threat3,
-    threat_3_reason: trim_(payload.threat3Reason),
     mission_stage: APP.stages.actions
   };
   updates.score_out_of_100 = calculateSubmissionScoreByStudentKey_(studentKey, updates);
@@ -588,8 +577,7 @@ function buildPosterFromTemplate_(templateId, outputFolder, posterName, submissi
 
   var majorThreatsText =
     '1. ' + (submission.threat_1 || '') + ': ' + (submission.threat_1_reason || '') + '\n\n' +
-    '2. ' + (submission.threat_2 || '') + ': ' + (submission.threat_2_reason || '') + '\n\n' +
-    '3. ' + (submission.threat_3 || '') + ': ' + (submission.threat_3_reason || '');
+    '2. ' + (submission.threat_2 || '') + ': ' + (submission.threat_2_reason || '');
 
   var actionLines = [];
   if (submission.action_1) actionLines.push('1. ' + submission.action_1);
@@ -617,21 +605,11 @@ function buildPosterFromTemplate_(templateId, outputFolder, posterName, submissi
     }
   }
 
-  var imageWarning = '';
-  var imageUrl = pickBestPosterImageUrl_(submission);
-  if (imageUrl) {
-    if (!insertSlideImageFromUrl_(slide, imageUrl)) {
-      imageWarning = 'Poster image could not be inserted automatically.';
-    }
-  } else {
-    imageWarning = 'No poster image was available, so the poster was created without an image.';
-  }
-
   presentation.saveAndClose();
 
   return {
     file: copiedFile,
-    warning: imageWarning
+    warning: ''
   };
 }
 
@@ -670,8 +648,7 @@ function buildFallbackPoster_(outputFolder, posterName, submission) {
   slide.insertTextBox(
     'Major Threats\n' +
     '1. ' + (submission.threat_1 || '') + ': ' + (submission.threat_1_reason || '') + '\n\n' +
-    '2. ' + (submission.threat_2 || '') + ': ' + (submission.threat_2_reason || '') + '\n\n' +
-    '3. ' + (submission.threat_3 || '') + ': ' + (submission.threat_3_reason || ''),
+    '2. ' + (submission.threat_2 || '') + ': ' + (submission.threat_2_reason || ''),
     340, 120, 360, 180
   ).getText().getTextStyle().setFontSize(12);
 
@@ -687,16 +664,6 @@ function buildFallbackPoster_(outputFolder, posterName, submission) {
     340, 320, 360, 160
   ).getText().getTextStyle().setFontSize(12);
 
-  var imageWarning = '';
-  var imageUrl = pickBestPosterImageUrl_(submission);
-  if (imageUrl) {
-    if (!insertSlideImageFromUrl_(slide, imageUrl)) {
-      imageWarning = 'Poster image could not be inserted automatically.';
-    }
-  } else {
-    imageWarning = 'No poster image was available, so the poster was created without an image.';
-  }
-
   pres.saveAndClose();
 
   try {
@@ -710,7 +677,7 @@ function buildFallbackPoster_(outputFolder, posterName, submission) {
 
   return {
     file: file,
-    warning: imageWarning
+    warning: ''
   };
 }
 
@@ -863,13 +830,12 @@ function calculateCompletionScore_(submission) {
     score += 25;
   }
 
-  var threatValues = [submission.threat_1, submission.threat_2, submission.threat_3];
+  var threatValues = [submission.threat_1, submission.threat_2];
   if (
     areAllFilled_(threatValues) &&
-    uniqueCount_(threatValues) === 3 &&
+    uniqueCount_(threatValues) === 2 &&
     trim_(submission.threat_1_reason).length >= 5 &&
-    trim_(submission.threat_2_reason).length >= 5 &&
-    trim_(submission.threat_3_reason).length >= 5
+    trim_(submission.threat_2_reason).length >= 5
   ) {
     score += 25;
   }
@@ -890,11 +856,7 @@ function calculateCompletionScore_(submission) {
   }
 
   if (trim_(submission.why_it_matters).length >= 8) {
-    score += 10;
-  }
-
-  if (isFilled_(submission.selected_image_url)) {
-    score += 10;
+    score += 20;
   }
 
   if (score > 100) score = 100;
