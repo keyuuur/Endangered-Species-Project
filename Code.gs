@@ -191,6 +191,11 @@ function resetProjectSheetsDangerously() {
 }
 
 function getInitialConfig() {
+  try {
+    getSpreadsheet_();
+  } catch (e) {
+    setupProjectSheets();
+  }
   seedDefaultSpeciesMasterIfNeeded_();
 
   var settings = getSettingsMap_();
@@ -352,23 +357,8 @@ function saveActions(studentKey, payload) {
   validateString_(studentKey, 'studentKey');
   validateRequired_(payload, ['action1', 'action2', 'actionExplanation']);
 
-  var actionValues = [payload.action1, payload.action2, payload.action3];
-  var filledActions = [];
-  var normalizedActions = {};
-
-  for (var i = 0; i < actionValues.length; i++) {
-    var value = trim_(actionValues[i]);
-    if (!value) continue;
-    filledActions.push(value);
-    normalizedActions[String(value).toLowerCase()] = true;
-  }
-
-  if (filledActions.length < 2) {
-    throw new Error('Please choose at least 2 conservation actions.');
-  }
-
-  if (Object.keys(normalizedActions).length !== filledActions.length) {
-    throw new Error('Please choose different conservation actions.');
+  if (trim_(payload.action1).toLowerCase() === trim_(payload.action2).toLowerCase()) {
+    throw new Error('Please choose 2 different conservation actions.');
   }
 
   if (trim_(payload.actionExplanation).length < 8) {
@@ -378,7 +368,6 @@ function saveActions(studentKey, payload) {
   var updates = {
     action_1: trim_(payload.action1),
     action_2: trim_(payload.action2),
-    action_3: trim_(payload.action3),
     action_explanation: trim_(payload.actionExplanation),
     mission_stage: APP.stages.final
   };

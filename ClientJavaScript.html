@@ -270,18 +270,22 @@
   function populateLinkContainer(container, species) {
     container.innerHTML = '';
 
-    var links = [species.research_link_1, species.research_link_2];
-    var labels = ['Research Link 1', 'Research Link 2'];
-
-    for (var i = 0; i < links.length; i++) {
-      if (!links[i]) continue;
+    if (species.research_link_1) {
       var a = document.createElement('a');
-      a.href = links[i];
+      a.href = species.research_link_1;
       a.target = '_blank';
       a.rel = 'noopener noreferrer';
-      a.textContent = labels[i];
+      a.textContent = 'Research Link';
       container.appendChild(a);
     }
+
+    var googleUrl = 'https://www.google.com/search?q=' + encodeURIComponent((species.common_name || '') + ' endangered species conservation');
+    var googleLink = document.createElement('a');
+    googleLink.href = googleUrl;
+    googleLink.target = '_blank';
+    googleLink.rel = 'noopener noreferrer';
+    googleLink.textContent = 'Find your own source! Careful for accuracy!';
+    container.appendChild(googleLink);
   }
 
   function handleSaveEcology() {
