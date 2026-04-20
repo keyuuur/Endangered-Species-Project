@@ -1,14 +1,6 @@
 /**
- * Endangered Species Rescue Mission — Reviewed Version 1.1
+ * Endangered Species Rescue Mission — Version 2.0
  * Google Apps Script server code
- *
- * Key safety improvements:
- * - setupProjectSheets() is NON-DESTRUCTIVE
- * - emergency submit is available at all times after login
- * - completion score is stored out of 100
- * - final submission still succeeds even if poster generation fails
- * - poster/student links are optional based on SETTINGS
- * - image insertion fetches image blobs instead of relying on hotlinking
  */
 
 var APP = {
@@ -16,6 +8,7 @@ var APP = {
     spreadsheetIdKey: 'ENDANGERED_SPECIES_SPREADSHEET_ID'
   },
   projectTitle: 'Endangered Species Rescue Mission',
+  outputFolderId: '1BESzdmXkmswTBApTqgiAeBZxLHgQo2mY',
   sheetNames: {
     species: 'SPECIES_MASTER',
     submissions: 'STUDENT_SUBMISSIONS',
@@ -32,10 +25,10 @@ var APP = {
     submitted: 'submitted'
   },
   posterImageBox: {
-    x: 36,
-    y: 110,
-    width: 300,
-    height: 220
+    x: 14,
+    y: 82,
+    width: 176,
+    height: 130
   },
   dropdowns: {
     habitatTypes: [
@@ -112,6 +105,37 @@ var APP = {
   }
 };
 
+/* ===== Test function — run from GAS editor to verify poster generation ===== */
+
+function testPosterGeneration() {
+  var fakeSubmission = {
+    first_name: 'Test', last_name: 'Student', hour: '1',
+    species_id: 'hawksbill-turtle',
+    common_name: 'Hawksbill Turtle', scientific_name: 'Eretmochelys imbricata',
+    biome: 'Marine', identified_status: 'Critically Endangered',
+    identified_scientific_name: 'Eretmochelys imbricata',
+    habitat_type: 'Coral reef', diet_type: 'Carnivore',
+    adaptation_type: 'Camouflage', ecosystem_role: 'Predator',
+    ecology_explanation: 'Lives in coral reef environments and feeds on sponges, which helps keep the reef balanced.',
+    threat_1: 'Habitat loss', threat_1_reason: 'Coral bleaching from climate change destroys their nesting and feeding areas.',
+    threat_2: 'Poaching / overhunting', threat_2_reason: 'Hunted for their shells and eggs despite international protection.',
+    action_1: 'Protected areas / habitat restoration', action_2: 'Anti-poaching / stronger laws',
+    action_explanation: 'Protected nesting beaches and stronger anti-poaching enforcement give populations time to recover.',
+    why_it_matters: 'Hawksbill turtles keep coral reefs healthy by controlling sponge populations, which allows corals to thrive.',
+    selected_image_url: ''
+  };
+  try {
+    var result = generatePosterForSubmission_(fakeSubmission);
+    Logger.log('SUCCESS: ' + JSON.stringify(result));
+    return 'SUCCESS — check Logger and your Drive folder.';
+  } catch (e) {
+    Logger.log('FAILED: ' + e + '\n' + e.stack);
+    return 'FAILED: ' + e;
+  }
+}
+
+/* ===== Web app entry points ===== */
+
 function doGet() {
   var template = HtmlService.createTemplateFromFile('Index');
   template.appTitle = APP.projectTitle;
@@ -125,10 +149,8 @@ function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
-/**
- * Non-destructive setup.
- * Safe to run more than once.
- */
+/* ===== Setup ===== */
+
 function setupProjectSheets() {
   var ss = getOrCreateSpreadsheet_();
 
@@ -142,20 +164,21 @@ function setupProjectSheets() {
   var submissionHeaders = [
     'timestamp_start', 'timestamp_submit', 'first_name', 'last_name', 'hour', 'student_key',
     'species_id', 'common_name', 'scientific_name', 'biome', 'mission_stage',
-    'identified_common_name', 'identified_status',
+    'identified_common_name', 'identified_scientific_name', 'identified_status',
     'habitat_type', 'diet_type', 'adaptation_type', 'ecosystem_role', 'ecology_explanation',
     'threat_1', 'threat_1_reason', 'threat_2', 'threat_2_reason', 'threat_3', 'threat_3_reason',
     'action_1', 'action_2', 'action_3', 'action_explanation',
     'why_it_matters', 'selected_image_url',
     'score_out_of_100', 'submit_type', 'submission_message',
     'poster_file_id', 'poster_slide_url', 'pdf_file_id', 'poster_pdf_url',
+    'tile_pdf_file_id', 'tile_pdf_url',
     'submission_status'
   ];
 
   var settingsHeaders = ['key', 'value'];
   var defaultSettings = [
     ['poster_template_file_id', 'PASTE_TEMPLATE_FILE_ID_HERE'],
-    ['output_folder_id', 'PASTE_OUTPUT_FOLDER_ID_HERE'],
+    ['output_folder_id', APP.outputFolderId],
     ['teacher_email', 'PASTE_TEACHER_EMAIL_HERE'],
     ['project_title', APP.projectTitle],
     ['share_output_with_link', 'TRUE'],
@@ -175,20 +198,17 @@ function setupProjectSheets() {
   return 'Project sheets are ready in: ' + ss.getUrl();
 }
 
-/**
- * Dangerous wipe helper, intentionally separate from setupProjectSheets().
- */
 function resetProjectSheetsDangerously() {
   var ss = getOrCreateSpreadsheet_();
   var names = [APP.sheetNames.species, APP.sheetNames.submissions, APP.sheetNames.settings];
   for (var i = 0; i < names.length; i++) {
     var sheet = ss.getSheetByName(names[i]);
-    if (sheet) {
-      ss.deleteSheet(sheet);
-    }
+    if (sheet) ss.deleteSheet(sheet);
   }
   return setupProjectSheets();
 }
+
+/* ===== Client-facing API functions ===== */
 
 function getInitialConfig() {
   try {
@@ -216,10 +236,9 @@ function startMission(student) {
   var sheet = ss.getSheetByName(APP.sheetNames.submissions);
   var headers = getHeaders_(sheet);
   var studentKey = Utilities.getUuid();
-  var timestamp = new Date();
 
   var rowObject = {
-    timestamp_start: timestamp,
+    timestamp_start: new Date(),
     timestamp_submit: '',
     first_name: trim_(student.firstName),
     last_name: trim_(student.lastName),
@@ -231,6 +250,7 @@ function startMission(student) {
     biome: '',
     mission_stage: APP.stages.species,
     identified_common_name: '',
+    identified_scientific_name: '',
     identified_status: '',
     habitat_type: '',
     diet_type: '',
@@ -256,15 +276,13 @@ function startMission(student) {
     poster_slide_url: '',
     pdf_file_id: '',
     poster_pdf_url: '',
+    tile_pdf_file_id: '',
+    tile_pdf_url: '',
     submission_status: 'Started'
   };
 
   appendObjectRow_(sheet, headers, rowObject);
-
-  return {
-    studentKey: studentKey,
-    currentStage: APP.stages.species
-  };
+  return { studentKey: studentKey, currentStage: APP.stages.species };
 }
 
 function saveSpeciesChoice(studentKey, speciesId) {
@@ -272,9 +290,7 @@ function saveSpeciesChoice(studentKey, speciesId) {
   validateString_(speciesId, 'speciesId');
 
   var species = findSpeciesById_(speciesId);
-  if (!species) {
-    throw new Error('Species not found for selection: ' + speciesId);
-  }
+  if (!species) throw new Error('Species not found: ' + speciesId);
 
   updateSubmissionByStudentKey_(studentKey, {
     species_id: species.species_id,
@@ -291,15 +307,12 @@ function saveSpeciesChoice(studentKey, speciesId) {
     })
   });
 
-  return {
-    currentStage: APP.stages.briefing,
-    species: species
-  };
+  return { currentStage: APP.stages.briefing, species: species };
 }
 
 function saveEcology(studentKey, payload) {
   validateString_(studentKey, 'studentKey');
-  validateRequired_(payload, ['commonNameAnswer', 'statusAnswer', 'habitatType', 'dietType', 'adaptationType', 'ecosystemRole', 'ecologyExplanation']);
+  validateRequired_(payload, ['commonNameAnswer', 'scientificNameAnswer', 'statusAnswer', 'habitatType', 'dietType', 'adaptationType', 'ecosystemRole', 'ecologyExplanation']);
 
   if (trim_(payload.ecologyExplanation).length < 8) {
     throw new Error('Please write a little more for the ecology explanation.');
@@ -307,6 +320,7 @@ function saveEcology(studentKey, payload) {
 
   var updates = {
     identified_common_name: trim_(payload.commonNameAnswer),
+    identified_scientific_name: trim_(payload.scientificNameAnswer),
     identified_status: trim_(payload.statusAnswer),
     habitat_type: payload.habitatType,
     diet_type: payload.dietType,
@@ -318,16 +332,12 @@ function saveEcology(studentKey, payload) {
 
   updates.score_out_of_100 = calculateSubmissionScoreByStudentKey_(studentKey, updates);
   updateSubmissionByStudentKey_(studentKey, updates);
-
   return { currentStage: APP.stages.threats };
 }
 
 function saveThreats(studentKey, payload) {
   validateString_(studentKey, 'studentKey');
-  validateRequired_(payload, [
-    'threat1', 'threat1Reason',
-    'threat2', 'threat2Reason'
-  ]);
+  validateRequired_(payload, ['threat1', 'threat1Reason', 'threat2', 'threat2Reason']);
 
   if (trim_(payload.threat1).toLowerCase() === trim_(payload.threat2).toLowerCase()) {
     throw new Error('Please choose 2 different threats.');
@@ -349,7 +359,6 @@ function saveThreats(studentKey, payload) {
   };
   updates.score_out_of_100 = calculateSubmissionScoreByStudentKey_(studentKey, updates);
   updateSubmissionByStudentKey_(studentKey, updates);
-
   return { currentStage: APP.stages.actions };
 }
 
@@ -373,7 +382,6 @@ function saveActions(studentKey, payload) {
   };
   updates.score_out_of_100 = calculateSubmissionScoreByStudentKey_(studentKey, updates);
   updateSubmissionByStudentKey_(studentKey, updates);
-
   return { currentStage: APP.stages.final };
 }
 
@@ -396,20 +404,13 @@ function finishMission(studentKey, payload) {
   updateSubmissionByStudentKey_(studentKey, prePosterUpdates);
 
   var submission = getSubmissionByStudentKey_(studentKey);
-  var output = {
-    slideUrl: '',
-    pdfUrl: '',
-    posterFileId: '',
-    pdfFileId: '',
-    warning: '',
-    studentCanViewFiles: false
-  };
+  var output = { slideUrl: '', pdfUrl: '', tilePdfUrl: '', posterFileId: '', pdfFileId: '', tilePdfFileId: '', warning: '', studentCanViewFiles: false };
 
   try {
     output = generatePosterForSubmission_(submission);
   } catch (error) {
     output.warning = 'Your work was submitted, but the poster file could not be created automatically. Tell your teacher.';
-    Logger.log('Poster generation failed for ' + studentKey + ': ' + error);
+    Logger.log('Poster generation failed for ' + studentKey + ': ' + error + '\n' + error.stack);
   }
 
   var finalUpdates = {
@@ -418,6 +419,8 @@ function finishMission(studentKey, payload) {
     poster_slide_url: output.slideUrl || '',
     pdf_file_id: output.pdfFileId || '',
     poster_pdf_url: output.pdfUrl || '',
+    tile_pdf_file_id: output.tilePdfFileId || '',
+    tile_pdf_url: output.tilePdfUrl || '',
     mission_stage: APP.stages.submitted,
     submission_status: output.warning ? 'Submitted - Poster Error' : 'Submitted',
     submission_message: output.warning || 'Submitted successfully.',
@@ -434,6 +437,7 @@ function finishMission(studentKey, payload) {
     submissionComplete: true,
     slideUrl: output.slideUrl || '',
     pdfUrl: output.pdfUrl || '',
+    tilePdfUrl: output.tilePdfUrl || '',
     studentCanViewFiles: output.studentCanViewFiles || false,
     warning: output.warning || ''
   };
@@ -461,7 +465,8 @@ function emergencySubmitMission(studentKey) {
     warning: 'Emergency submit saved your current work. Tell your teacher.',
     studentCanViewFiles: false,
     slideUrl: '',
-    pdfUrl: ''
+    pdfUrl: '',
+    tilePdfUrl: ''
   };
 }
 
@@ -469,7 +474,353 @@ function getSubmissionDebug(studentKey) {
   return getSubmissionByStudentKey_(studentKey);
 }
 
-/* -------------------- Poster generation -------------------- */
+/* ===== Poster drawing primitives ===== */
+
+function hexToRgb_(hex) {
+  var r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  return r ? { r: parseInt(r[1], 16), g: parseInt(r[2], 16), b: parseInt(r[3], 16) } : { r: 255, g: 255, b: 255 };
+}
+
+function pRect_(slide, x, y, w, h, fillHex, borderHex, borderPt, rounded) {
+  var shape = slide.insertShape(
+    rounded ? SlidesApp.ShapeType.ROUND_RECTANGLE : SlidesApp.ShapeType.RECTANGLE,
+    x, y, w, h
+  );
+  var fc = hexToRgb_(fillHex);
+  shape.getFill().setSolidFill(fc.r, fc.g, fc.b);
+  var bc = borderHex ? hexToRgb_(borderHex) : fc;
+  shape.getBorder().getLineFill().setSolidFill(bc.r, bc.g, bc.b);
+  shape.getBorder().setWeight(borderHex ? (borderPt || 1) : 1);
+  return shape;
+}
+
+function pText_(slide, text, x, y, w, h, opts) {
+  var tb = slide.insertTextBox(text || '', x, y, w, h);
+  var ts = tb.getText().getTextStyle();
+  ts.setFontFamily(opts.font || 'Arial');
+  ts.setFontSize(opts.size || 9);
+  if (opts.bold) ts.setBold(true);
+  if (opts.italic) ts.setItalic(true);
+  if (opts.color) ts.setForegroundColor(opts.color);
+  if (opts.align) {
+    var paras = tb.getText().getParagraphs();
+    for (var i = 0; i < paras.length; i++) {
+      paras[i].getParagraphStyle().setParagraphAlignment(opts.align);
+    }
+  }
+  return tb;
+}
+
+function pLine_(slide, x, y, w, colorHex) {
+  return pRect_(slide, x, y, w, 1, colorHex, null, 0, false);
+}
+
+/* ===== Product A poster section drawers ===== */
+
+function posterA_drawHeader_(slide, submission, studentName) {
+  pRect_(slide, 0, 4, 720, 64, '#153324', null, 0, false);
+  pRect_(slide, 0, 4, 6, 64, '#2e7d5b', null, 0, false);
+
+  pText_(slide, 'ENDANGERED SPECIES RESCUE REPORT', 22, 16, 520, 18,
+    { font: 'Georgia', size: 11, bold: true, color: '#c8e6c9' });
+  pText_(slide, submission.common_name || 'Species Rescue', 22, 31, 500, 28,
+    { font: 'Georgia', size: 20, bold: true, color: '#ffffff' });
+  pText_(slide, submission.scientific_name || '', 22, 55, 400, 16,
+    { font: 'Georgia', size: 10, italic: true, color: '#81c784' });
+
+  var attribution = 'Student: ' + studentName;
+  if (trim_(submission.hour)) attribution += '    Period ' + trim_(submission.hour);
+  pText_(slide, attribution, 490, 24, 220, 15,
+    { font: 'Arial', size: 9, color: '#a5d6a7', align: SlidesApp.ParagraphAlignment.END });
+
+  var status = trim_(submission.identified_status) || 'Endangered';
+  pRect_(slide, 620, 48, 90, 18, '#c62828', null, 0, true);
+  pText_(slide, status.toUpperCase(), 620, 48, 90, 18,
+    { font: 'Arial', size: 8, bold: true, color: '#ffcdd2', align: SlidesApp.ParagraphAlignment.CENTER });
+}
+
+function posterA_drawPhotoCol_(slide, submission) {
+  pRect_(slide, 8, 76, 188, 192, '#1a3a25', '#2e7d5b', 1, true);
+  pRect_(slide, 14, 82, 176, 130, '#0d2b18', null, 0, true);
+
+  pText_(slide, 'QUICK FACTS', 14, 219, 176, 13,
+    { font: 'Arial', size: 8, bold: true, color: '#81c784' });
+  pLine_(slide, 14, 232, 176, '#2e7d5b');
+
+  var facts = [
+    ['Habitat:', submission.habitat_type || '\u2014'],
+    ['Diet:', submission.diet_type || '\u2014'],
+    ['Adaptation:', submission.adaptation_type || '\u2014']
+  ];
+  var fy = 237;
+  for (var fi = 0; fi < facts.length; fi++) {
+    pText_(slide, facts[fi][0], 14, fy, 44, 13, { font: 'Arial', size: 8, color: '#c8e6c9' });
+    pText_(slide, facts[fi][1], 60, fy, 130, 13, { font: 'Arial', size: 8, color: '#a5d6a7' });
+    fy += 13;
+  }
+}
+
+function posterA_drawEcologyCol_(slide, submission) {
+  pRect_(slide, 204, 76, 250, 192, '#1a2c3a', '#1565c0', 1, true);
+  pRect_(slide, 204, 76, 250, 22, '#1a3a5c', null, 0, true);
+  pRect_(slide, 204, 90, 250, 8, '#1a3a5c', null, 0, false);
+  pText_(slide, 'ECOLOGY', 214, 79, 230, 16,
+    { font: 'Arial', size: 9, bold: true, color: '#90caf9' });
+
+  pRect_(slide, 212, 103, 234, 38, '#0d2137', '#1565c0', 1, true);
+  pText_(slide, 'ECOSYSTEM ROLE', 219, 104, 220, 13,
+    { font: 'Arial', size: 8, bold: true, color: '#64b5f6' });
+  pText_(slide, submission.ecosystem_role || '', 219, 117, 220, 20,
+    { font: 'Arial', size: 8, color: '#bbdefb' });
+
+  pText_(slide, 'ECOLOGICAL EXPLANATION', 212, 145, 234, 13,
+    { font: 'Arial', size: 8, bold: true, color: '#64b5f6' });
+  pLine_(slide, 212, 159, 234, '#1565c0');
+  pText_(slide, submission.ecology_explanation || '', 212, 161, 234, 104,
+    { font: 'Arial', size: 8, color: '#bbdefb' });
+}
+
+function posterA_drawThreatsCol_(slide, submission) {
+  pRect_(slide, 462, 76, 250, 192, '#2d1515', '#c62828', 1, true);
+  pRect_(slide, 462, 76, 250, 22, '#3e1a1a', null, 0, true);
+  pRect_(slide, 462, 90, 250, 8, '#3e1a1a', null, 0, false);
+  pText_(slide, 'THREATS', 472, 79, 230, 16,
+    { font: 'Arial', size: 9, bold: true, color: '#ef9a9a' });
+
+  var t1 = trim_(submission.threat_1) || 'Threat 1';
+  pRect_(slide, 470, 103, 234, 80, '#3e1111', '#c62828', 1, true);
+  pText_(slide, 'THREAT 1 \u2014 ' + t1.toUpperCase(), 477, 104, 222, 14,
+    { font: 'Arial', size: 8, bold: true, color: '#ef5350' });
+  pText_(slide, trim_(submission.threat_1_reason) || '', 477, 119, 222, 60,
+    { font: 'Arial', size: 8, color: '#ffcdd2' });
+
+  var t2 = trim_(submission.threat_2) || 'Threat 2';
+  pRect_(slide, 470, 188, 234, 78, '#3e1111', '#c62828', 1, true);
+  pText_(slide, 'THREAT 2 \u2014 ' + t2.toUpperCase(), 477, 189, 222, 14,
+    { font: 'Arial', size: 8, bold: true, color: '#ef5350' });
+  pText_(slide, trim_(submission.threat_2_reason) || '', 477, 204, 222, 60,
+    { font: 'Arial', size: 8, color: '#ffcdd2' });
+}
+
+function posterA_drawConservation_(slide, submission) {
+  pRect_(slide, 8, 276, 350, 114, '#1e1a2d', '#6a1b9a', 1, true);
+  pRect_(slide, 8, 276, 350, 22, '#2e1f4a', null, 0, true);
+  pRect_(slide, 8, 290, 350, 8, '#2e1f4a', null, 0, false);
+  pText_(slide, 'CONSERVATION ACTIONS', 18, 279, 320, 16,
+    { font: 'Arial', size: 9, bold: true, color: '#ce93d8' });
+
+  var a1 = trim_(submission.action_1) || '';
+  var a2 = trim_(submission.action_2) || '';
+  pRect_(slide, 18, 305, 155, 20, '#311b47', '#7b1fa2', 1, true);
+  pText_(slide, a1, 18, 305, 155, 20,
+    { font: 'Arial', size: 8, bold: true, color: '#e1bee7', align: SlidesApp.ParagraphAlignment.CENTER });
+  pRect_(slide, 181, 305, 165, 20, '#311b47', '#7b1fa2', 1, true);
+  pText_(slide, a2, 181, 305, 165, 20,
+    { font: 'Arial', size: 8, bold: true, color: '#e1bee7', align: SlidesApp.ParagraphAlignment.CENTER });
+
+  pText_(slide, 'HOW THESE ACTIONS HELP', 18, 328, 320, 13,
+    { font: 'Arial', size: 8, bold: true, color: '#ba68c8' });
+  pLine_(slide, 18, 342, 330, '#6a1b9a');
+  pText_(slide, trim_(submission.action_explanation) || '', 18, 344, 330, 42,
+    { font: 'Arial', size: 8, color: '#e1bee7' });
+}
+
+function posterA_drawWhyMatters_(slide, submission) {
+  pRect_(slide, 366, 276, 346, 114, '#1a2a1a', '#2e7d5b', 1, true);
+  pRect_(slide, 366, 276, 346, 22, '#1e3d23', null, 0, true);
+  pRect_(slide, 366, 290, 346, 8, '#1e3d23', null, 0, false);
+  pText_(slide, 'WHY THIS SPECIES MATTERS', 376, 279, 326, 16,
+    { font: 'Arial', size: 9, bold: true, color: '#a5d6a7' });
+  pText_(slide, trim_(submission.why_it_matters) || '', 376, 302, 330, 84,
+    { font: 'Arial', size: 8, color: '#c8e6c9' });
+}
+
+/* ===== Product B tile section drawers ===== */
+
+function tileA_draw_(slide, submission, studentName) {
+  var bg = hexToRgb_('#0d1f14');
+  slide.getBackground().setSolidFill(bg.r, bg.g, bg.b);
+
+  pRect_(slide, 0, 0, 720, 5, '#2e7d5b', null, 0, false);
+  pRect_(slide, 0, 5, 720, 22, '#153324', null, 0, false);
+  pText_(slide, 'ENDANGERED SPECIES RESCUE', 0, 9, 720, 14,
+    { font: 'Arial', size: 8, bold: true, color: '#81c784', align: SlidesApp.ParagraphAlignment.CENTER });
+
+  pText_(slide, submission.common_name || '', 0, 26, 720, 32,
+    { font: 'Georgia', size: 22, bold: true, color: '#ffffff', align: SlidesApp.ParagraphAlignment.CENTER });
+  pText_(slide, submission.scientific_name || '', 0, 59, 720, 16,
+    { font: 'Georgia', size: 9, italic: true, color: '#81c784', align: SlidesApp.ParagraphAlignment.CENTER });
+
+  var status = trim_(submission.identified_status) || 'Endangered';
+  pRect_(slide, 300, 77, 120, 16, '#c62828', null, 0, true);
+  pText_(slide, status.toUpperCase(), 300, 77, 120, 16,
+    { font: 'Arial', size: 8, bold: true, color: '#ffcdd2', align: SlidesApp.ParagraphAlignment.CENTER });
+
+  pLine_(slide, 10, 99, 700, '#c62828');
+  pText_(slide, 'THREATS', 0, 102, 720, 14,
+    { font: 'Arial', size: 8, bold: true, color: '#ef9a9a', align: SlidesApp.ParagraphAlignment.CENTER });
+
+  var t1 = trim_(submission.threat_1) || 'Threat 1';
+  pRect_(slide, 10, 119, 700, 80, '#2d0e0e', '#c62828', 1, true);
+  pText_(slide, 'THREAT 1 \u2014 ' + t1.toUpperCase(), 18, 121, 684, 14,
+    { font: 'Arial', size: 8, bold: true, color: '#ef5350' });
+  pText_(slide, trim_(submission.threat_1_reason) || '', 18, 136, 684, 60,
+    { font: 'Arial', size: 8, color: '#ffcdd2' });
+
+  var t2 = trim_(submission.threat_2) || 'Threat 2';
+  pRect_(slide, 10, 204, 700, 80, '#2d0e0e', '#c62828', 1, true);
+  pText_(slide, 'THREAT 2 \u2014 ' + t2.toUpperCase(), 18, 206, 684, 14,
+    { font: 'Arial', size: 8, bold: true, color: '#ef5350' });
+  pText_(slide, trim_(submission.threat_2_reason) || '', 18, 221, 684, 60,
+    { font: 'Arial', size: 8, color: '#ffcdd2' });
+
+  pText_(slide, studentName, 0, 370, 720, 14,
+    { font: 'Arial', size: 8, color: '#a5d6a7', align: SlidesApp.ParagraphAlignment.CENTER });
+  pRect_(slide, 0, 390, 720, 5, '#2e7d5b', null, 0, false);
+}
+
+function tileB_draw_(slide, submission) {
+  var bg = hexToRgb_('#0d1826');
+  slide.getBackground().setSolidFill(bg.r, bg.g, bg.b);
+
+  pRect_(slide, 0, 0, 720, 5, '#1565c0', null, 0, false);
+  pRect_(slide, 0, 5, 720, 22, '#1a3a5c', null, 0, false);
+  pText_(slide, 'ECOLOGY', 0, 9, 720, 14,
+    { font: 'Arial', size: 9, bold: true, color: '#90caf9', align: SlidesApp.ParagraphAlignment.CENTER });
+  pLine_(slide, 10, 28, 700, '#1565c0');
+
+  var rows = [
+    ['Habitat', submission.habitat_type || '\u2014'],
+    ['Diet', submission.diet_type || '\u2014'],
+    ['Key Adaptation', submission.adaptation_type || '\u2014'],
+    ['Ecosystem Role', submission.ecosystem_role || '\u2014']
+  ];
+  var ry = 36;
+  for (var ri = 0; ri < rows.length; ri++) {
+    pText_(slide, rows[ri][0], 20, ry, 340, 13, { font: 'Arial', size: 8, bold: true, color: '#64b5f6' });
+    pText_(slide, rows[ri][1], 20, ry + 13, 680, 13, { font: 'Arial', size: 8, color: '#bbdefb' });
+    ry += 30;
+  }
+
+  pLine_(slide, 10, ry + 2, 700, '#1565c0');
+  pText_(slide, 'Ecological Explanation', 20, ry + 6, 680, 13,
+    { font: 'Arial', size: 8, bold: true, color: '#64b5f6' });
+  pText_(slide, trim_(submission.ecology_explanation) || '', 20, ry + 20, 680, 80,
+    { font: 'Arial', size: 8, italic: true, color: '#90caf9' });
+
+  pRect_(slide, 0, 390, 720, 5, '#1565c0', null, 0, false);
+}
+
+function tileC_draw_(slide, submission, imageUrl) {
+  var bg = hexToRgb_('#0a1a10');
+  slide.getBackground().setSolidFill(bg.r, bg.g, bg.b);
+
+  pRect_(slide, 0, 0, 720, 5, '#2e7d5b', null, 0, false);
+  pRect_(slide, 8, 10, 704, 280, '#071410', '#2e7d5b', 1, true);
+
+  if (imageUrl) {
+    try {
+      var resp = UrlFetchApp.fetch(imageUrl, { muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': 'Mozilla/5.0' } });
+      if (resp.getResponseCode() >= 200 && resp.getResponseCode() < 300) {
+        slide.insertImage(resp.getBlob(), 8, 10, 704, 280);
+      } else {
+        try { slide.insertImage(imageUrl, 8, 10, 704, 280); } catch (e2) {}
+      }
+    } catch (imgErr) {
+      try { slide.insertImage(imageUrl, 8, 10, 704, 280); } catch (e2) {}
+    }
+  }
+
+  pLine_(slide, 8, 294, 704, '#2e7d5b');
+  pText_(slide, submission.common_name || '', 0, 299, 720, 22,
+    { font: 'Georgia', size: 13, bold: true, color: '#ffffff', align: SlidesApp.ParagraphAlignment.CENTER });
+  pText_(slide, submission.scientific_name || '', 0, 322, 720, 14,
+    { font: 'Georgia', size: 9, italic: true, color: '#81c784', align: SlidesApp.ParagraphAlignment.CENTER });
+  var status = trim_(submission.identified_status) || 'Endangered';
+  pText_(slide, 'Conservation Status: ' + status.toUpperCase(), 0, 337, 720, 14,
+    { font: 'Arial', size: 8, color: '#a5d6a7', align: SlidesApp.ParagraphAlignment.CENTER });
+  pRect_(slide, 0, 390, 720, 5, '#2e7d5b', null, 0, false);
+}
+
+function tileD_draw_(slide, submission) {
+  var bg = hexToRgb_('#160d26');
+  slide.getBackground().setSolidFill(bg.r, bg.g, bg.b);
+
+  pRect_(slide, 0, 0, 720, 5, '#7b1fa2', null, 0, false);
+  pRect_(slide, 0, 5, 720, 22, '#2e1f4a', null, 0, false);
+  pText_(slide, 'CONSERVATION ACTIONS', 0, 9, 720, 14,
+    { font: 'Arial', size: 9, bold: true, color: '#ce93d8', align: SlidesApp.ParagraphAlignment.CENTER });
+  pLine_(slide, 10, 28, 700, '#7b1fa2');
+
+  pRect_(slide, 10, 34, 700, 22, '#2a0f40', '#7b1fa2', 1, true);
+  pText_(slide, trim_(submission.action_1) || '', 10, 34, 700, 22,
+    { font: 'Arial', size: 9, bold: true, color: '#e1bee7', align: SlidesApp.ParagraphAlignment.CENTER });
+  pRect_(slide, 10, 61, 700, 22, '#2a0f40', '#7b1fa2', 1, true);
+  pText_(slide, trim_(submission.action_2) || '', 10, 61, 700, 22,
+    { font: 'Arial', size: 9, bold: true, color: '#e1bee7', align: SlidesApp.ParagraphAlignment.CENTER });
+
+  pLine_(slide, 10, 90, 700, '#7b1fa2');
+  pText_(slide, 'How They Help', 20, 94, 680, 13,
+    { font: 'Arial', size: 8, bold: true, color: '#ba68c8' });
+  pText_(slide, trim_(submission.action_explanation) || '', 20, 108, 680, 80,
+    { font: 'Arial', size: 8, color: '#e1bee7' });
+
+  pRect_(slide, 0, 390, 720, 5, '#7b1fa2', null, 0, false);
+}
+
+function tileE_draw_(slide, submission, studentName) {
+  var bg = hexToRgb_('#0d1f14');
+  slide.getBackground().setSolidFill(bg.r, bg.g, bg.b);
+
+  pRect_(slide, 0, 0, 720, 5, '#2e7d5b', null, 0, false);
+  pRect_(slide, 0, 5, 720, 22, '#1e3d23', null, 0, false);
+  pText_(slide, 'WHY THIS SPECIES MATTERS', 0, 9, 720, 14,
+    { font: 'Arial', size: 9, bold: true, color: '#a5d6a7', align: SlidesApp.ParagraphAlignment.CENTER });
+  pLine_(slide, 10, 28, 700, '#2e7d5b');
+
+  pText_(slide, '\u201c', 20, 34, 40, 36, { font: 'Georgia', size: 30, color: '#2e7d5b' });
+  pText_(slide, trim_(submission.why_it_matters) || '', 30, 44, 660, 130,
+    { font: 'Georgia', size: 9, italic: true, color: '#c8e6c9' });
+  pText_(slide, '\u201d', 660, 160, 40, 36, { font: 'Georgia', size: 30, color: '#2e7d5b' });
+
+  pLine_(slide, 10, 300, 700, '#2e7d5b');
+  pText_(slide, 'student-authored', 0, 305, 720, 13,
+    { font: 'Arial', size: 8, italic: true, color: '#81c784', align: SlidesApp.ParagraphAlignment.CENTER });
+  pText_(slide, studentName, 0, 320, 720, 14,
+    { font: 'Arial', size: 9, color: '#a5d6a7', align: SlidesApp.ParagraphAlignment.CENTER });
+  pRect_(slide, 0, 390, 720, 5, '#2e7d5b', null, 0, false);
+}
+
+/* ===== Product B builder ===== */
+
+function buildTilePdf_(outputFolder, baseName, submission) {
+  var pres = SlidesApp.create(baseName + ' - Wall Tiles');
+  var file = DriveApp.getFileById(pres.getId());
+  var studentName = ([submission.first_name || '', submission.last_name || '']).join(' ').trim();
+  var imageUrl = pickBestPosterImageUrl_(submission);
+
+  var slides = pres.getSlides();
+  while (slides.length < 5) { pres.appendSlide(); slides = pres.getSlides(); }
+
+  var clearSlide = function(s) {
+    var els = s.getPageElements();
+    for (var i = els.length - 1; i >= 0; i--) { try { els[i].remove(); } catch (e) {} }
+  };
+  for (var si = 0; si < 5; si++) { clearSlide(slides[si]); }
+
+  try { tileA_draw_(slides[0], submission, studentName); } catch (e) { Logger.log('tileA failed: ' + e); }
+  try { tileB_draw_(slides[1], submission); } catch (e) { Logger.log('tileB failed: ' + e); }
+  try { tileC_draw_(slides[2], submission, imageUrl); } catch (e) { Logger.log('tileC failed: ' + e); }
+  try { tileD_draw_(slides[3], submission); } catch (e) { Logger.log('tileD failed: ' + e); }
+  try { tileE_draw_(slides[4], submission, studentName); } catch (e) { Logger.log('tileE failed: ' + e); }
+
+  pres.saveAndClose();
+  try { outputFolder.addFile(file); } catch (e) {}
+  try { DriveApp.getRootFolder().removeFile(file); } catch (e) {}
+  return { file: file, warning: '' };
+}
+
+/* ===== Poster generation ===== */
 
 function generatePosterForSubmission_(submission) {
   var settings = getSettingsMap_();
@@ -480,14 +831,7 @@ function generatePosterForSubmission_(submission) {
   if (folderResult.warning) warnings.push(folderResult.warning);
 
   var studentName = [submission.first_name, submission.last_name].join(' ').trim();
-  var posterName = sanitizeFileName_([
-    'Rescue Poster',
-    submission.common_name || 'Species',
-    studentName || 'Student'
-  ].join(' - '));
-
-  var shareWithLink = true;
-  var showStudentOutputLinks = true;
+  var posterName = sanitizeFileName_(['Rescue Poster', submission.common_name || 'Species', studentName || 'Student'].join(' - '));
 
   var posterFile = null;
   var buildResult = null;
@@ -500,7 +844,7 @@ function generatePosterForSubmission_(submission) {
       posterFile = buildResult.file;
       if (buildResult.warning) warnings.push(buildResult.warning);
     } catch (templateError) {
-      Logger.log('Template poster build failed. Falling back to simple poster. ' + templateError);
+      Logger.log('Template poster build failed. Falling back. ' + templateError);
       warnings.push('Template poster failed, so a simple poster was created instead.');
     }
   }
@@ -511,9 +855,7 @@ function generatePosterForSubmission_(submission) {
     if (buildResult.warning) warnings.push(buildResult.warning);
   }
 
-  if (!posterFile) {
-    throw new Error('Poster file could not be created.');
-  }
+  if (!posterFile) throw new Error('Poster file could not be created.');
 
   var pdfFile = null;
   try {
@@ -523,16 +865,33 @@ function generatePosterForSubmission_(submission) {
     warnings.push('Poster was created, but PDF export failed.');
   }
 
-  if (shareWithLink) {
+  var tileName = sanitizeFileName_(['Wall Tiles', submission.common_name || 'Species', studentName || 'Student'].join(' - '));
+  var tileFile = null;
+  var tilePdfFile = null;
+  try {
+    var tileResult = buildTilePdf_(outputFolder, tileName, submission);
+    tileFile = tileResult.file;
+    if (tileResult.warning) warnings.push(tileResult.warning);
+  } catch (tileError) {
+    Logger.log('Tile build failed: ' + tileError);
+    warnings.push('Poster was created, but the wall-tile file could not be generated.');
+  }
+
+  if (tileFile) {
     try {
-      posterFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-      if (pdfFile) {
-        pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-      }
-    } catch (shareError) {
-      Logger.log('Sharing update failed: ' + shareError);
-      warnings.push('Poster was created, but sharing settings could not be updated automatically.');
+      tilePdfFile = exportSlidesFileAsPdfWithRetry_(tileFile.getId(), tileName, outputFolder);
+    } catch (tilePdfError) {
+      Logger.log('Tile PDF export failed: ' + tilePdfError);
     }
+  }
+
+  try {
+    posterFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    if (pdfFile) pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    if (tileFile) tileFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    if (tilePdfFile) tilePdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (shareError) {
+    Logger.log('Sharing update failed: ' + shareError);
   }
 
   return {
@@ -540,8 +899,10 @@ function generatePosterForSubmission_(submission) {
     pdfUrl: pdfFile ? pdfFile.getUrl() : '',
     posterFileId: posterFile.getId(),
     pdfFileId: pdfFile ? pdfFile.getId() : '',
+    tilePdfUrl: tilePdfFile ? tilePdfFile.getUrl() : '',
+    tilePdfFileId: tilePdfFile ? tilePdfFile.getId() : '',
     warning: warnings.join(' '),
-    studentCanViewFiles: showStudentOutputLinks && !!posterFile.getId()
+    studentCanViewFiles: !!posterFile.getId()
   };
 }
 
@@ -551,11 +912,7 @@ function buildPosterFromTemplate_(templateId, outputFolder, posterName, submissi
   var presentation = SlidesApp.openById(copiedFile.getId());
   var slides = presentation.getSlides();
 
-  if (!slides || !slides.length) {
-    throw new Error('Poster template does not contain any slides.');
-  }
-
-  var slide = slides[0];
+  if (!slides || !slides.length) throw new Error('Poster template has no slides.');
 
   var habitatEcologyText =
     (submission.habitat_type || '') + '\n' +
@@ -571,11 +928,7 @@ function buildPosterFromTemplate_(templateId, outputFolder, posterName, submissi
   var actionLines = [];
   if (submission.action_1) actionLines.push('1. ' + submission.action_1);
   if (submission.action_2) actionLines.push((actionLines.length + 1) + '. ' + submission.action_2);
-  if (submission.action_3) actionLines.push((actionLines.length + 1) + '. ' + submission.action_3);
-
-  var conservationActionsText =
-    actionLines.join('\n') + '\n\n' +
-    (submission.action_explanation || '');
+  var conservationActionsText = actionLines.join('\n') + '\n\n' + (submission.action_explanation || '');
 
   var replacements = {
     '{{STUDENT_NAME}}': [submission.first_name, submission.last_name].join(' ').trim(),
@@ -595,114 +948,88 @@ function buildPosterFromTemplate_(templateId, outputFolder, posterName, submissi
   }
 
   presentation.saveAndClose();
-
-  return {
-    file: copiedFile,
-    warning: ''
-  };
+  return { file: copiedFile, warning: '' };
 }
 
 function buildFallbackPoster_(outputFolder, posterName, submission) {
   var pres = SlidesApp.create(posterName);
   var file = DriveApp.getFileById(pres.getId());
   var slide = pres.getSlides()[0];
-  var elements = slide.getPageElements();
-  var i;
 
-  for (i = elements.length - 1; i >= 0; i--) {
-    try { elements[i].remove(); } catch (removeError) {}
+  var els = slide.getPageElements();
+  for (var i = els.length - 1; i >= 0; i--) {
+    try { els[i].remove(); } catch (e) {}
   }
 
-  slide.insertTextBox(
-    (submission.common_name || 'Species Rescue Poster') + '\n' + (submission.scientific_name || ''),
-    30, 20, 420, 60
-  ).getText().getTextStyle().setFontSize(22).setBold(true);
+  var bg = hexToRgb_('#0d1f14');
+  slide.getBackground().setSolidFill(bg.r, bg.g, bg.b);
 
-  slide.insertTextBox(
-    'Student: ' + ([submission.first_name, submission.last_name].join(' ').trim() || '') +
-    (submission.hour ? '    Hour: ' + submission.hour : ''),
-    30, 82, 420, 24
-  ).getText().getTextStyle().setFontSize(11);
+  var studentName = ([submission.first_name || '', submission.last_name || '']).join(' ').trim();
 
-  slide.insertTextBox(
-    'Habitat & Ecology\n' +
-    (submission.habitat_type || '') + '\n' +
-    (submission.diet_type || '') + '\n' +
-    (submission.adaptation_type || '') + '\n' +
-    (submission.ecosystem_role || '') + '\n\n' +
-    (submission.ecology_explanation || ''),
-    30, 120, 300, 180
-  ).getText().getTextStyle().setFontSize(12);
+  var sections = [
+    ['topBar',       function() { pRect_(slide, 0, 0, 720, 4, '#2e7d5b', null, 0, false); }],
+    ['header',       function() { posterA_drawHeader_(slide, submission, studentName); }],
+    ['photoCol',     function() { posterA_drawPhotoCol_(slide, submission); }],
+    ['ecologyCol',   function() { posterA_drawEcologyCol_(slide, submission); }],
+    ['threatsCol',   function() { posterA_drawThreatsCol_(slide, submission); }],
+    ['conservation', function() { posterA_drawConservation_(slide, submission); }],
+    ['whyMatters',   function() { posterA_drawWhyMatters_(slide, submission); }],
+    ['bottomBar',    function() { pRect_(slide, 0, 401, 720, 4, '#2e7d5b', null, 0, false); }]
+  ];
 
-  slide.insertTextBox(
-    'Major Threats\n' +
-    '1. ' + (submission.threat_1 || '') + ': ' + (submission.threat_1_reason || '') + '\n\n' +
-    '2. ' + (submission.threat_2 || '') + ': ' + (submission.threat_2_reason || ''),
-    340, 120, 360, 180
-  ).getText().getTextStyle().setFontSize(12);
+  for (var si = 0; si < sections.length; si++) {
+    try {
+      sections[si][1]();
+    } catch (sectionErr) {
+      Logger.log('Poster section "' + sections[si][0] + '" failed: ' + sectionErr);
+    }
+  }
 
-  var actionsText = 'Conservation Actions\n';
-  if (submission.action_1) actionsText += '1. ' + submission.action_1 + '\n';
-  if (submission.action_2) actionsText += '2. ' + submission.action_2 + '\n';
-  if (submission.action_3) actionsText += '3. ' + submission.action_3 + '\n';
-  actionsText += '\n' + (submission.action_explanation || '');
-
-  slide.insertTextBox(actionsText, 30, 320, 300, 160).getText().getTextStyle().setFontSize(12);
-  slide.insertTextBox(
-    'Why This Species Matters\n' + (submission.why_it_matters || ''),
-    340, 320, 360, 160
-  ).getText().getTextStyle().setFontSize(12);
+  var imageUrl = pickBestPosterImageUrl_(submission);
+  if (imageUrl) {
+    try { insertSlideImageFromUrl_(slide, imageUrl); } catch (imgErr) {
+      Logger.log('Image insert failed: ' + imgErr);
+    }
+  }
 
   pres.saveAndClose();
-
-  try {
-    outputFolder.addFile(file);
-  } catch (addErr) {}
-
-  try {
-    var root = DriveApp.getRootFolder();
-    root.removeFile(file);
-  } catch (removeErr) {}
-
-  return {
-    file: file,
-    warning: ''
-  };
+  try { outputFolder.addFile(file); } catch (addErr) {}
+  try { DriveApp.getRootFolder().removeFile(file); } catch (removeErr) {}
+  return { file: file, warning: '' };
 }
+
+/* ===== Image and folder helpers ===== */
 
 function pickBestPosterImageUrl_(submission) {
   if (isUsableSpeciesImageUrl_(submission.selected_image_url)) {
     return trim_(submission.selected_image_url);
   }
-
   var species = submission.species_id ? findSpeciesById_(submission.species_id) : null;
   if (!species) return '';
-
-  var candidates = [
-    species.image_option_1_url,
-    species.image_option_2_url,
-    species.image_option_3_url
-  ];
-
+  var candidates = [species.image_option_1_url, species.image_option_2_url, species.image_option_3_url];
   for (var i = 0; i < candidates.length; i++) {
-    if (isUsableSpeciesImageUrl_(candidates[i])) {
-      return trim_(candidates[i]);
-    }
+    if (isUsableSpeciesImageUrl_(candidates[i])) return trim_(candidates[i]);
   }
   return '';
 }
 
 function getOutputFolderSafe_(folderId) {
-  try {
-    if (hasConfiguredDriveId_(folderId)) {
-      return { folder: DriveApp.getFolderById(folderId), warning: '' };
+  var idsToTry = [];
+  if (hasConfiguredDriveId_(folderId)) idsToTry.push(folderId);
+  if (hasConfiguredDriveId_(APP.outputFolderId)) idsToTry.push(APP.outputFolderId);
+
+  for (var t = 0; t < idsToTry.length; t++) {
+    try {
+      var folder = DriveApp.getFolderById(idsToTry[t]);
+      Logger.log('Using output folder: ' + folder.getName() + ' (' + idsToTry[t] + ')');
+      return { folder: folder, warning: '' };
+    } catch (folderError) {
+      Logger.log('Output folder ' + idsToTry[t] + ' unavailable: ' + folderError);
     }
-  } catch (folderError) {
-    Logger.log('Configured output folder invalid. Falling back to root. ' + folderError);
   }
   return {
     folder: DriveApp.getRootFolder(),
-    warning: 'Output folder was not configured correctly, so files were saved in the owner Drive root.'
+    warning: 'Output folder was not configured correctly, so files were saved in Drive root.'
   };
 }
 
@@ -717,55 +1044,35 @@ function insertSlideImageFromUrl_(slide, imageUrl) {
   if (!imageUrl) return false;
   try {
     var response = UrlFetchApp.fetch(imageUrl, {
-      muteHttpExceptions: true,
-      followRedirects: true,
-      headers: {
-        'User-Agent': 'Mozilla/5.0'
-      }
+      muteHttpExceptions: true, followRedirects: true,
+      headers: { 'User-Agent': 'Mozilla/5.0' }
     });
     if (response.getResponseCode() >= 200 && response.getResponseCode() < 300) {
-      slide.insertImage(
-        response.getBlob(),
-        APP.posterImageBox.x,
-        APP.posterImageBox.y,
-        APP.posterImageBox.width,
-        APP.posterImageBox.height
-      );
+      slide.insertImage(response.getBlob(), APP.posterImageBox.x, APP.posterImageBox.y, APP.posterImageBox.width, APP.posterImageBox.height);
       return true;
     }
   } catch (error) {
-    Logger.log('UrlFetch image insert failed. Falling back to direct URL. ' + error);
+    Logger.log('UrlFetch image insert failed. Trying direct URL. ' + error);
   }
-
   try {
-    slide.insertImage(
-      imageUrl,
-      APP.posterImageBox.x,
-      APP.posterImageBox.y,
-      APP.posterImageBox.width,
-      APP.posterImageBox.height
-    );
+    slide.insertImage(imageUrl, APP.posterImageBox.x, APP.posterImageBox.y, APP.posterImageBox.width, APP.posterImageBox.height);
     return true;
   } catch (fallbackError) {
     Logger.log('Image insert failed for URL: ' + imageUrl + ' :: ' + fallbackError);
   }
-
   return false;
 }
 
 function exportSlidesFileAsPdfWithRetry_(presentationId, posterName, outputFolder) {
   var attempts = 3;
   var lastError = null;
-  var i;
-
   Utilities.sleep(1000);
 
-  for (i = 0; i < attempts; i++) {
+  for (var i = 0; i < attempts; i++) {
     try {
       var file = DriveApp.getFileById(presentationId);
       var pdfBlob = file.getAs(MimeType.PDF).setName(posterName + '.pdf');
-      var pdfFile = outputFolder.createFile(pdfBlob);
-      return pdfFile;
+      return outputFolder.createFile(pdfBlob);
     } catch (drivePdfError) {
       lastError = drivePdfError;
       Logger.log('Drive PDF export attempt ' + (i + 1) + ' failed: ' + drivePdfError);
@@ -775,27 +1082,24 @@ function exportSlidesFileAsPdfWithRetry_(presentationId, posterName, outputFolde
       var exportUrl = 'https://docs.google.com/presentation/d/' + presentationId + '/export/pdf';
       var response = UrlFetchApp.fetch(exportUrl, {
         headers: { Authorization: 'Bearer ' + ScriptApp.getOAuthToken() },
-        muteHttpExceptions: true,
-        followRedirects: true
+        muteHttpExceptions: true, followRedirects: true
       });
       if (response.getResponseCode() >= 200 && response.getResponseCode() < 300) {
         var exportBlob = response.getBlob().setName(posterName + '.pdf');
         return outputFolder.createFile(exportBlob);
       }
       lastError = new Error('Slides export HTTP ' + response.getResponseCode());
-      Logger.log('Slides export attempt ' + (i + 1) + ' failed: HTTP ' + response.getResponseCode());
     } catch (urlFetchError) {
       lastError = urlFetchError;
       Logger.log('Slides export attempt ' + (i + 1) + ' UrlFetch failed: ' + urlFetchError);
     }
-
     Utilities.sleep(1200);
   }
 
   throw lastError || new Error('PDF export failed after retries.');
 }
 
-/* -------------------- Scoring -------------------- */
+/* ===== Scoring ===== */
 
 function calculateSubmissionScoreByStudentKey_(studentKey, pendingUpdates) {
   var submission = getSubmissionByStudentKey_(studentKey);
@@ -804,224 +1108,141 @@ function calculateSubmissionScoreByStudentKey_(studentKey, pendingUpdates) {
 
 function calculateCompletionScore_(submission) {
   var score = 0;
-
   if (isFilled_(submission.species_id)) score += 10;
 
-  if (
-    isFilled_(submission.identified_common_name) &&
-    isFilled_(submission.identified_status) &&
-    isFilled_(submission.habitat_type) &&
-    isFilled_(submission.diet_type) &&
-    isFilled_(submission.adaptation_type) &&
-    isFilled_(submission.ecosystem_role) &&
-    trim_(submission.ecology_explanation).length >= 8
-  ) {
+  if (isFilled_(submission.identified_common_name) && isFilled_(submission.identified_status) &&
+      isFilled_(submission.habitat_type) && isFilled_(submission.diet_type) &&
+      isFilled_(submission.adaptation_type) && isFilled_(submission.ecosystem_role) &&
+      trim_(submission.ecology_explanation).length >= 8) {
     score += 25;
   }
 
   var threatValues = [submission.threat_1, submission.threat_2];
-  if (
-    areAllFilled_(threatValues) &&
-    uniqueCount_(threatValues) === 2 &&
-    trim_(submission.threat_1_reason).length >= 5 &&
-    trim_(submission.threat_2_reason).length >= 5
-  ) {
+  if (areAllFilled_(threatValues) && uniqueCount_(threatValues) === 2 &&
+      trim_(submission.threat_1_reason).length >= 5 && trim_(submission.threat_2_reason).length >= 5) {
     score += 25;
   }
 
-  var actionValues = [submission.action_1, submission.action_2, submission.action_3];
-  var filledActionValues = [];
-  for (var av = 0; av < actionValues.length; av++) {
-    if (isFilled_(actionValues[av])) {
-      filledActionValues.push(actionValues[av]);
-    }
-  }
-  if (
-    filledActionValues.length >= 2 &&
-    uniqueCount_(filledActionValues) === filledActionValues.length &&
-    trim_(submission.action_explanation).length >= 8
-  ) {
+  var actionValues = [submission.action_1, submission.action_2];
+  var filledActions = actionValues.filter(function(v) { return isFilled_(v); });
+  if (filledActions.length >= 2 && uniqueCount_(filledActions) === filledActions.length &&
+      trim_(submission.action_explanation).length >= 8) {
     score += 20;
   }
 
-  if (trim_(submission.why_it_matters).length >= 8) {
-    score += 20;
-  }
+  if (trim_(submission.why_it_matters).length >= 8) score += 20;
 
   if (score > 100) score = 100;
   if (score < 0) score = 0;
   return score;
 }
 
-
-/* -------------------- Default species catalog -------------------- */
+/* ===== Default species catalog ===== */
 
 function getDefaultSpeciesCatalog_() {
   return [
     {
-      species_id: 'hawksbill-turtle',
-      common_name: 'Hawksbill Turtle',
-      scientific_name: 'Eretmochelys imbricata',
-      biome: 'Marine',
-      status: 'Critically Endangered',
-      region: 'Tropical oceans and coral reefs',
+      species_id: 'hawksbill-turtle', common_name: 'Hawksbill Turtle',
+      scientific_name: 'Eretmochelys imbricata', biome: 'Marine',
+      status: 'Critically Endangered', region: 'Tropical oceans and coral reefs',
       briefing_text: 'Your mission is to investigate the hawksbill turtle. Find out where it lives, what role it plays in reef ecosystems, what threats are causing its decline, and what people can do to help protect it.',
-      habitat_hint: 'Coral reef',
-      diet_hint: 'Carnivore',
-      ecosystem_role_hint: 'Consumer in reef food webs',
-      image_option_1_url: '',
-      image_option_2_url: '',
-      image_option_3_url: '',
+      habitat_hint: 'Coral reef', diet_hint: 'Carnivore', ecosystem_role_hint: 'Consumer in reef food webs',
+      image_option_1_url: '', image_option_2_url: '', image_option_3_url: '',
       research_link_1: 'https://www.worldwildlife.org/species/sea-turtle/hawksbill-turtle',
       research_link_2: 'https://www.worldwildlife.org/species'
     },
     {
-      species_id: 'whale-shark',
-      common_name: 'Whale Shark',
-      scientific_name: 'Rhincodon typus',
-      biome: 'Marine',
-      status: 'Endangered',
-      region: 'Warm tropical oceans',
+      species_id: 'whale-shark', common_name: 'Whale Shark',
+      scientific_name: 'Rhincodon typus', biome: 'Marine',
+      status: 'Endangered', region: 'Warm tropical oceans',
       briefing_text: 'Your mission is to investigate the whale shark. Learn where it lives, how it survives, what is putting it at risk, and which conservation actions could help protect it.',
-      habitat_hint: 'Open ocean',
-      diet_hint: 'Filter feeder',
-      ecosystem_role_hint: 'Large marine consumer',
-      image_option_1_url: '',
-      image_option_2_url: '',
-      image_option_3_url: '',
+      habitat_hint: 'Open ocean', diet_hint: 'Filter feeder', ecosystem_role_hint: 'Large marine consumer',
+      image_option_1_url: '', image_option_2_url: '', image_option_3_url: '',
       research_link_1: 'https://www.worldwildlife.org/species/shark/whale-shark',
       research_link_2: 'https://www.worldwildlife.org/species'
     },
     {
-      species_id: 'blue-whale',
-      common_name: 'Blue Whale',
-      scientific_name: 'Balaenoptera musculus',
-      biome: 'Marine',
-      status: 'Endangered',
-      region: 'Oceans worldwide',
+      species_id: 'blue-whale', common_name: 'Blue Whale',
+      scientific_name: 'Balaenoptera musculus', biome: 'Marine',
+      status: 'Endangered', region: 'Oceans worldwide',
       briefing_text: 'Your mission is to investigate the blue whale. Study where it lives, how it survives, what threats it faces, and how conservation efforts can help it recover.',
-      habitat_hint: 'Open ocean',
-      diet_hint: 'Carnivore',
-      ecosystem_role_hint: 'Large marine consumer',
-      image_option_1_url: '',
-      image_option_2_url: '',
-      image_option_3_url: '',
+      habitat_hint: 'Open ocean', diet_hint: 'Carnivore', ecosystem_role_hint: 'Large marine consumer',
+      image_option_1_url: '', image_option_2_url: '', image_option_3_url: '',
       research_link_1: 'https://www.worldwildlife.org/species/blue-whale',
       research_link_2: 'https://www.worldwildlife.org/species'
     },
     {
-      species_id: 'bornean-orangutan',
-      common_name: 'Bornean Orangutan',
-      scientific_name: 'Pongo pygmaeus',
-      biome: 'Rainforest / Forest',
-      status: 'Critically Endangered',
-      region: 'Borneo rainforests',
+      species_id: 'bornean-orangutan', common_name: 'Bornean Orangutan',
+      scientific_name: 'Pongo pygmaeus', biome: 'Rainforest / Forest',
+      status: 'Critically Endangered', region: 'Borneo rainforests',
       briefing_text: 'Your mission is to investigate the Bornean orangutan. Find out how it survives in the rainforest, what threats are reducing its population, and what humans can do to help.',
-      habitat_hint: 'Rainforest',
-      diet_hint: 'Omnivore',
-      ecosystem_role_hint: 'Seed disperser',
-      image_option_1_url: '',
-      image_option_2_url: '',
-      image_option_3_url: '',
+      habitat_hint: 'Rainforest', diet_hint: 'Omnivore', ecosystem_role_hint: 'Seed disperser',
+      image_option_1_url: '', image_option_2_url: '', image_option_3_url: '',
       research_link_1: 'https://www.worldwildlife.org/species/orangutan/bornean-orangutan',
       research_link_2: 'https://www.worldwildlife.org/species'
     },
     {
-      species_id: 'red-panda',
-      common_name: 'Red Panda',
-      scientific_name: 'Ailurus fulgens',
-      biome: 'Rainforest / Forest',
-      status: 'Endangered',
-      region: 'Eastern Himalayas and southwestern China',
+      species_id: 'red-panda', common_name: 'Red Panda',
+      scientific_name: 'Ailurus fulgens', biome: 'Rainforest / Forest',
+      status: 'Endangered', region: 'Eastern Himalayas and southwestern China',
       briefing_text: 'Your mission is to investigate the red panda. Learn about its forest habitat, what it eats, the threats to its survival, and how people can protect it.',
-      habitat_hint: 'Temperate forest',
-      diet_hint: 'Omnivore',
-      ecosystem_role_hint: 'Consumer in forest food webs',
-      image_option_1_url: '',
-      image_option_2_url: '',
-      image_option_3_url: '',
+      habitat_hint: 'Temperate forest', diet_hint: 'Omnivore', ecosystem_role_hint: 'Consumer in forest food webs',
+      image_option_1_url: '', image_option_2_url: '', image_option_3_url: '',
       research_link_1: 'https://www.worldwildlife.org/species/red-panda',
       research_link_2: 'https://www.worldwildlife.org/species'
     },
     {
-      species_id: 'african-forest-elephant',
-      common_name: 'African Forest Elephant',
-      scientific_name: 'Loxodonta cyclotis',
-      biome: 'Rainforest / Forest',
-      status: 'Critically Endangered',
-      region: 'Central and West African forests',
+      species_id: 'african-forest-elephant', common_name: 'African Forest Elephant',
+      scientific_name: 'Loxodonta cyclotis', biome: 'Rainforest / Forest',
+      status: 'Critically Endangered', region: 'Central and West African forests',
       briefing_text: 'Your mission is to investigate the African forest elephant. Explore its habitat, its role in the ecosystem, the threats it faces, and the actions that could help protect it.',
-      habitat_hint: 'Rainforest',
-      diet_hint: 'Herbivore',
-      ecosystem_role_hint: 'Seed disperser',
-      image_option_1_url: '',
-      image_option_2_url: '',
-      image_option_3_url: '',
+      habitat_hint: 'Rainforest', diet_hint: 'Herbivore', ecosystem_role_hint: 'Seed disperser',
+      image_option_1_url: '', image_option_2_url: '', image_option_3_url: '',
       research_link_1: 'https://www.worldwildlife.org/species/elephant/african-elephant/african-forest-elephant',
       research_link_2: 'https://www.worldwildlife.org/species'
     },
     {
-      species_id: 'african-wild-dog',
-      common_name: 'African Wild Dog',
-      scientific_name: 'Lycaon pictus',
-      biome: 'Desert / Grassland',
-      status: 'Endangered',
-      region: 'Sub-Saharan grasslands and savannas',
+      species_id: 'african-wild-dog', common_name: 'African Wild Dog',
+      scientific_name: 'Lycaon pictus', biome: 'Desert / Grassland',
+      status: 'Endangered', region: 'Sub-Saharan grasslands and savannas',
       briefing_text: 'Your mission is to investigate the African wild dog. Find out where it lives, how it survives, what is causing its decline, and how conservation could help its pack populations recover.',
-      habitat_hint: 'Grassland',
-      diet_hint: 'Carnivore',
-      ecosystem_role_hint: 'Predator',
-      image_option_1_url: '',
-      image_option_2_url: '',
-      image_option_3_url: '',
+      habitat_hint: 'Grassland', diet_hint: 'Carnivore', ecosystem_role_hint: 'Predator',
+      image_option_1_url: '', image_option_2_url: '', image_option_3_url: '',
       research_link_1: 'https://www.worldwildlife.org/species/african-wild-dog',
       research_link_2: 'https://www.worldwildlife.org/species'
     },
     {
-      species_id: 'black-footed-ferret',
-      common_name: 'Black-footed Ferret',
-      scientific_name: 'Mustela nigripes',
-      biome: 'Desert / Grassland',
-      status: 'Endangered',
-      region: 'North American prairies and grasslands',
+      species_id: 'black-footed-ferret', common_name: 'Black-footed Ferret',
+      scientific_name: 'Mustela nigripes', biome: 'Desert / Grassland',
+      status: 'Endangered', region: 'North American prairies and grasslands',
       briefing_text: 'Your mission is to investigate the black-footed ferret. Learn about its prairie habitat, how it survives, why it is endangered, and what can help increase its population.',
-      habitat_hint: 'Prairie',
-      diet_hint: 'Carnivore',
-      ecosystem_role_hint: 'Predator',
-      image_option_1_url: '',
-      image_option_2_url: '',
-      image_option_3_url: '',
+      habitat_hint: 'Prairie', diet_hint: 'Carnivore', ecosystem_role_hint: 'Predator',
+      image_option_1_url: '', image_option_2_url: '', image_option_3_url: '',
       research_link_1: 'https://www.worldwildlife.org/species/black-footed-ferret',
       research_link_2: 'https://www.worldwildlife.org/species'
     },
     {
-      species_id: 'addax',
-      common_name: 'Addax',
-      scientific_name: 'Addax nasomaculatus',
-      biome: 'Desert / Grassland',
-      status: 'Critically Endangered',
-      region: 'Sahara Desert',
+      species_id: 'addax', common_name: 'Addax',
+      scientific_name: 'Addax nasomaculatus', biome: 'Desert / Grassland',
+      status: 'Critically Endangered', region: 'Sahara Desert',
       briefing_text: 'Your mission is to investigate the addax. Study how it survives in desert conditions, what is causing its population decline, and what people can do to help prevent extinction.',
-      habitat_hint: 'Desert',
-      diet_hint: 'Herbivore',
-      ecosystem_role_hint: 'Grazer',
-      image_option_1_url: '',
-      image_option_2_url: '',
-      image_option_3_url: '',
+      habitat_hint: 'Desert', diet_hint: 'Herbivore', ecosystem_role_hint: 'Grazer',
+      image_option_1_url: '', image_option_2_url: '', image_option_3_url: '',
       research_link_1: 'https://www.worldwildlife.org/species',
       research_link_2: 'https://www.saharaconservation.org/species-recovery/restoring-the-addax/'
     }
   ];
 }
 
+/* ===== Image URL helpers ===== */
+
 function createPlaceholderImageDataUri_(label, hexColor) {
   var safeLabel = String(label || 'Species').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  var svg =
-    '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="520">' +
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="520">' +
     '<rect width="100%" height="100%" fill="' + (hexColor || '#d9d0bf') + '"/>' +
     '<rect x="26" y="26" width="748" height="468" rx="24" fill="#fffaf0" opacity="0.72"/>' +
-    '<text x="400" y="230" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="56" font-weight="700" fill="#2f4f3f">Poster Image</text>' +
-    '<text x="400" y="310" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="36" fill="#2f4f3f">' + safeLabel + '</text>' +
+    '<text x="400" y="230" text-anchor="middle" font-family="Arial" font-size="56" font-weight="700" fill="#2f4f3f">Poster Image</text>' +
+    '<text x="400" y="310" text-anchor="middle" font-family="Arial" font-size="36" fill="#2f4f3f">' + safeLabel + '</text>' +
     '</svg>';
   return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
 }
@@ -1032,67 +1253,23 @@ function wikiFileUrl_(fileName) {
 
 function getCuratedImageSetForSpecies_(speciesId) {
   var fileNameMap = {
-    'hawksbill-turtle': [
-      'Hawksbill Turtle.jpg',
-      'Hawksbill sea turtle.jpg',
-      'Hawksbill turtle off the coast of Saba.jpg'
-    ],
-    'whale-shark': [
-      'Whale Shark AdF.jpg',
-      'Whale shark.JPG',
-      'Whale Shark (Rhincodon typus) with open mouth in La Paz, Mexico.jpg'
-    ],
-    'blue-whale': [
-      'Balaenoptera musculus (blue whale) 1 (31068434305).jpg',
-      'Bluewhale877.jpg',
-      'Blue Whale 003 noaa blowholes.jpg'
-    ],
-    'bornean-orangutan': [
-      'Bornean Orangutan.jpg',
-      'Bornean orangutan (Pongo pygmaeus), Tanjung Putting National Park 05.jpg',
-      'Male Bornean Orangutan - Big Cheeks.jpg'
-    ],
-    'red-panda': [
-      'Red Panda.JPG',
-      'Red Panda (24986761703).jpg',
-      'Wiki loves red panda.jpg'
-    ],
-    'african-forest-elephant': [
-      'Loxodontacyclotis.jpg',
-      'Forest elephant.jpg',
-      'African Forest Elephant - Mole National Part Wildlife, Northern Ghana.jpg'
-    ],
-    'african-wild-dog': [
-      'African Wild Dog at Working with Wildlife.jpg',
-      'African wild dog (25934660276).jpg',
-      'African wild dog (7660880326).jpg'
-    ],
-    'black-footed-ferret': [
-      'Black footed ferret.jpg',
-      'Black-footed Ferret Learning to Hunt.jpg',
-      'Black-footed ferret (6001739395).jpg'
-    ],
-    'addax': [
-      'A big male Addax showing as the power of his horns.jpg',
-      'Addax nasomaculatus.jpg',
-      'Addax (Addax nasomaculatus) adult male and juvenile.jpg'
-    ]
+    'hawksbill-turtle': ['Hawksbill Turtle.jpg', 'Hawksbill sea turtle.jpg', 'Hawksbill turtle off the coast of Saba.jpg'],
+    'whale-shark': ['Whale Shark AdF.jpg', 'Whale shark.JPG', 'Whale Shark (Rhincodon typus) with open mouth in La Paz, Mexico.jpg'],
+    'blue-whale': ['Balaenoptera musculus (blue whale) 1 (31068434305).jpg', 'Bluewhale877.jpg', 'Blue Whale 003 noaa blowholes.jpg'],
+    'bornean-orangutan': ['Bornean Orangutan.jpg', 'Bornean orangutan (Pongo pygmaeus), Tanjung Putting National Park 05.jpg', 'Male Bornean Orangutan - Big Cheeks.jpg'],
+    'red-panda': ['Red Panda.JPG', 'Red Panda (24986761703).jpg', 'Wiki loves red panda.jpg'],
+    'african-forest-elephant': ['Loxodontacyclotis.jpg', 'Forest elephant.jpg', 'African Forest Elephant - Mole National Part Wildlife, Northern Ghana.jpg'],
+    'african-wild-dog': ['African Wild Dog at Working with Wildlife.jpg', 'African wild dog (25934660276).jpg', 'African wild dog (7660880326).jpg'],
+    'black-footed-ferret': ['Black footed ferret.jpg', 'Black-footed Ferret Learning to Hunt.jpg', 'Black-footed ferret (6001739395).jpg'],
+    'addax': ['A big male Addax showing as the power of his horns.jpg', 'Addax nasomaculatus.jpg', 'Addax (Addax nasomaculatus) adult male and juvenile.jpg']
   };
-
   var fileNames = fileNameMap[speciesId] || [];
-  var urls = [];
-  for (var i = 0; i < fileNames.length; i++) {
-    urls.push(wikiFileUrl_(fileNames[i]));
-  }
-  return urls;
+  return fileNames.map(function(fn) { return wikiFileUrl_(fn); });
 }
 
 function getFallbackImageSetForSpecies_(speciesId, commonName) {
   var curated = getCuratedImageSetForSpecies_(speciesId);
-  if (curated && curated.length === 3) {
-    return curated;
-  }
-
+  if (curated && curated.length === 3) return curated;
   var colorMap = {
     'hawksbill-turtle': ['#cfe7ee', '#d8e9d2', '#efe0c8'],
     'whale-shark': ['#d2e6f8', '#d9ecf6', '#cfe3f2'],
@@ -1105,11 +1282,7 @@ function getFallbackImageSetForSpecies_(speciesId, commonName) {
     'addax': ['#efe5d2', '#f3ead8', '#f5efe0']
   };
   var colors = colorMap[speciesId] || ['#d9d0bf', '#e5dac5', '#ece6da'];
-  return [
-    createPlaceholderImageDataUri_(commonName, colors[0]),
-    createPlaceholderImageDataUri_(commonName, colors[1]),
-    createPlaceholderImageDataUri_(commonName, colors[2])
-  ];
+  return colors.map(function(c) { return createPlaceholderImageDataUri_(commonName, c); });
 }
 
 function shouldBackfillImageValue_(value) {
@@ -1121,31 +1294,6 @@ function shouldBackfillImageValue_(value) {
   return false;
 }
 
-function resolveSpeciesImageSet_(speciesId, commonName, rawUrls) {
-  var curated = getCuratedImageSetForSpecies_(speciesId);
-  if (curated && curated.length === 3) {
-    return curated;
-  }
-
-  var validRaw = [];
-  var i;
-  for (i = 0; i < rawUrls.length; i++) {
-    if (isUsableSpeciesImageUrl_(rawUrls[i])) {
-      validRaw.push(trim_(rawUrls[i]));
-    }
-  }
-
-  while (validRaw.length && validRaw.length < 3) {
-    validRaw.push(validRaw[validRaw.length - 1]);
-  }
-
-  if (validRaw.length >= 3) {
-    return validRaw.slice(0, 3);
-  }
-
-  return getFallbackImageSetForSpecies_(speciesId, commonName);
-}
-
 function isUsableSpeciesImageUrl_(url) {
   var text = trim_(url);
   if (!text) return false;
@@ -1153,54 +1301,13 @@ function isUsableSpeciesImageUrl_(url) {
   return /^https?:\/\//i.test(text);
 }
 
-function buildThreeChoicesFromSeedUrls_(seedUrls) {
-  var out = [];
-  var seen = {};
-  var i;
-
-  for (i = 0; i < seedUrls.length; i++) {
-    var normalized = trim_(seedUrls[i]);
-    if (!normalized) continue;
-
-    var variants = deriveImageVariants_(normalized);
-    var j;
-    for (j = 0; j < variants.length; j++) {
-      var candidate = variants[j];
-      if (candidate && !seen[candidate]) {
-        seen[candidate] = true;
-        out.push(candidate);
-      }
-      if (out.length === 3) {
-        return out;
-      }
-    }
-  }
-
-  while (out.length && out.length < 3) {
-    out.push(out[out.length - 1]);
-  }
-
-  return out;
-}
-
-function deriveImageVariants_(url) {
-  var clean = trim_(url);
-  if (!clean) return [];
-
-  var variants = [clean];
-  var match = clean.match(/^(https:\/\/upload\.wikimedia\.org\/wikipedia\/commons)\/thumb\/([^?]+)\/(\d+)px\-(.+)$/i);
-  if (match) {
-    var base = match[1];
-    var filePath = match[2];
-    var fileName = match[4];
-    variants = [
-      clean,
-      base + '/thumb/' + filePath + '/640px-' + fileName,
-      base + '/' + filePath
-    ];
-  }
-
-  return variants;
+function resolveSpeciesImageSet_(speciesId, commonName, rawUrls) {
+  var curated = getCuratedImageSetForSpecies_(speciesId);
+  if (curated && curated.length === 3) return curated;
+  var validRaw = rawUrls.filter(function(u) { return isUsableSpeciesImageUrl_(u); }).map(function(u) { return trim_(u); });
+  while (validRaw.length && validRaw.length < 3) validRaw.push(validRaw[validRaw.length - 1]);
+  if (validRaw.length >= 3) return validRaw.slice(0, 3);
+  return getFallbackImageSetForSpecies_(speciesId, commonName);
 }
 
 function seedDefaultSpeciesMasterIfNeeded_() {
@@ -1226,35 +1333,26 @@ function patchMissingSpeciesImageData_() {
   var sheet = ss.getSheetByName(APP.sheetNames.species);
   var data = getObjectsFromSheet_(sheet);
   var headers = getHeaders_(sheet);
-
   if (!data.length) return;
 
   var imageHeaders = ['image_option_1_url', 'image_option_2_url', 'image_option_3_url'];
-
   for (var i = 0; i < data.length; i++) {
     if (!trim_(data[i].species_id)) continue;
-
     var resolvedImages = resolveSpeciesImageSet_(data[i].species_id, data[i].common_name, [
-      data[i].image_option_1_url,
-      data[i].image_option_2_url,
-      data[i].image_option_3_url
+      data[i].image_option_1_url, data[i].image_option_2_url, data[i].image_option_3_url
     ]);
-
     for (var j = 0; j < imageHeaders.length; j++) {
-      var header = imageHeaders[j];
-      var colIndex = headers.indexOf(header);
+      var colIndex = headers.indexOf(imageHeaders[j]);
       if (colIndex === -1) continue;
-      if (trim_(data[i][header]) !== resolvedImages[j]) {
+      if (trim_(data[i][imageHeaders[j]]) !== resolvedImages[j]) {
         sheet.getRange(i + 2, colIndex + 1).setValue(resolvedImages[j]);
       }
     }
   }
-
   SpreadsheetApp.flush();
 }
 
-
-/* -------------------- Data access -------------------- */
+/* ===== Data access ===== */
 
 function getSpeciesData_() {
   var ss = getSpreadsheet_();
@@ -1264,9 +1362,7 @@ function getSpeciesData_() {
   var defaultMap = {};
   var out = [];
 
-  for (var d = 0; d < defaults.length; d++) {
-    defaultMap[defaults[d].species_id] = defaults[d];
-  }
+  for (var d = 0; d < defaults.length; d++) defaultMap[defaults[d].species_id] = defaults[d];
 
   for (var i = 0; i < rows.length; i++) {
     if (rows[i].species_id && rows[i].common_name) {
@@ -1294,24 +1390,21 @@ function getSpeciesData_() {
 
   if (!out.length) {
     for (var j = 0; j < defaults.length; j++) {
-      var fallbackOnlyImages = getFallbackImageSetForSpecies_(defaults[j].species_id, defaults[j].common_name);
+      var fi = getFallbackImageSetForSpecies_(defaults[j].species_id, defaults[j].common_name);
       out.push(mergeObjects_(defaults[j], {
-        image_option_1_url: defaults[j].image_option_1_url || fallbackOnlyImages[0],
-        image_option_2_url: defaults[j].image_option_2_url || fallbackOnlyImages[1],
-        image_option_3_url: defaults[j].image_option_3_url || fallbackOnlyImages[2]
+        image_option_1_url: defaults[j].image_option_1_url || fi[0],
+        image_option_2_url: defaults[j].image_option_2_url || fi[1],
+        image_option_3_url: defaults[j].image_option_3_url || fi[2]
       }));
     }
   }
-
   return out;
 }
 
 function findSpeciesById_(speciesId) {
   var species = getSpeciesData_();
   for (var i = 0; i < species.length; i++) {
-    if (species[i].species_id === speciesId) {
-      return species[i];
-    }
+    if (species[i].species_id === speciesId) return species[i];
   }
   return null;
 }
@@ -1320,13 +1413,9 @@ function getSubmissionByStudentKey_(studentKey) {
   var ss = getSpreadsheet_();
   var sheet = ss.getSheetByName(APP.sheetNames.submissions);
   var objects = getObjectsFromSheet_(sheet);
-
   for (var i = 0; i < objects.length; i++) {
-    if (String(objects[i].student_key) === String(studentKey)) {
-      return objects[i];
-    }
+    if (String(objects[i].student_key) === String(studentKey)) return objects[i];
   }
-
   throw new Error('Submission not found for studentKey: ' + studentKey);
 }
 
@@ -1337,14 +1426,10 @@ function updateSubmissionByStudentKey_(studentKey, updates) {
   var values = dataRange.getValues();
   var headers = values[0];
 
-  if (values.length < 2) {
-    throw new Error('No student submissions found to update.');
-  }
+  if (values.length < 2) throw new Error('No student submissions found to update.');
 
   var studentKeyColumnIndex = headers.indexOf('student_key');
-  if (studentKeyColumnIndex === -1) {
-    throw new Error('student_key column missing from STUDENT_SUBMISSIONS.');
-  }
+  if (studentKeyColumnIndex === -1) throw new Error('student_key column missing from STUDENT_SUBMISSIONS.');
 
   for (var rowIndex = 1; rowIndex < values.length; rowIndex++) {
     if (String(values[rowIndex][studentKeyColumnIndex]) === String(studentKey)) {
@@ -1352,9 +1437,7 @@ function updateSubmissionByStudentKey_(studentKey, updates) {
       for (var key in updates) {
         if (updates.hasOwnProperty(key)) {
           var colIndex = headers.indexOf(key);
-          if (colIndex !== -1) {
-            row[colIndex] = updates[key];
-          }
+          if (colIndex !== -1) row[colIndex] = updates[key];
         }
       }
       sheet.getRange(rowIndex + 1, 1, 1, row.length).setValues([row]);
@@ -1362,7 +1445,6 @@ function updateSubmissionByStudentKey_(studentKey, updates) {
       return;
     }
   }
-
   throw new Error('Unable to update submission; studentKey not found: ' + studentKey);
 }
 
@@ -1371,46 +1453,30 @@ function getSettingsMap_() {
   var sheet = ss.getSheetByName(APP.sheetNames.settings);
   var values = sheet.getDataRange().getValues();
   var map = {};
-
   for (var i = 1; i < values.length; i++) {
     var key = trim_(values[i][0]);
     if (!key) continue;
     map[key] = values[i][1];
   }
-
   return map;
 }
 
-/* -------------------- Spreadsheet helpers -------------------- */
+/* ===== Spreadsheet helpers ===== */
 
 function getSpreadsheet_() {
   var active = SpreadsheetApp.getActiveSpreadsheet();
-  if (active) {
-    setSpreadsheetId_(active.getId());
-    return active;
-  }
-
+  if (active) { setSpreadsheetId_(active.getId()); return active; }
   var storedId = PropertiesService.getScriptProperties().getProperty(APP.scriptProps.spreadsheetIdKey);
-  if (storedId) {
-    return SpreadsheetApp.openById(storedId);
-  }
-
+  if (storedId) return SpreadsheetApp.openById(storedId);
   throw new Error('No spreadsheet is configured yet. Run setupProjectSheets() once from the Apps Script editor.');
 }
 
 function getOrCreateSpreadsheet_() {
   var active = SpreadsheetApp.getActiveSpreadsheet();
-  if (active) {
-    setSpreadsheetId_(active.getId());
-    return active;
-  }
-
+  if (active) { setSpreadsheetId_(active.getId()); return active; }
   var props = PropertiesService.getScriptProperties();
   var storedId = props.getProperty(APP.scriptProps.spreadsheetIdKey);
-  if (storedId) {
-    return SpreadsheetApp.openById(storedId);
-  }
-
+  if (storedId) return SpreadsheetApp.openById(storedId);
   var ss = SpreadsheetApp.create(APP.projectTitle + ' Data');
   setSpreadsheetId_(ss.getId());
   return ss;
@@ -1422,9 +1488,7 @@ function setSpreadsheetId_(spreadsheetId) {
 
 function ensureSheetHeaders_(ss, sheetName, headers) {
   var sheet = ss.getSheetByName(sheetName);
-  if (!sheet) {
-    sheet = ss.insertSheet(sheetName);
-  }
+  if (!sheet) sheet = ss.insertSheet(sheetName);
 
   if (sheet.getLastRow() === 0 && sheet.getLastColumn() === 0) {
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
@@ -1438,9 +1502,7 @@ function ensureSheetHeaders_(ss, sheetName, headers) {
 
   if (existingHeaders.length > headers.length) {
     if (sheet.getLastRow() > 1) {
-      throw new Error(
-        'Sheet "' + sheetName + '" has extra columns beyond the expected layout. Remove or rename them manually before continuing.'
-      );
+      throw new Error('Sheet "' + sheetName + '" has extra columns. Remove or rename them manually before continuing.');
     }
     sheet.clearContents();
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
@@ -1449,9 +1511,7 @@ function ensureSheetHeaders_(ss, sheetName, headers) {
   }
 
   for (var i = 0; i < headers.length; i++) {
-    if (existingHeaders[i] === headers[i]) {
-      continue;
-    }
+    if (existingHeaders[i] === headers[i]) continue;
     if (i >= existingHeaders.length) {
       sheet.getRange(1, i + 1).setValue(headers[i]);
       existingHeaders.push(headers[i]);
@@ -1459,9 +1519,7 @@ function ensureSheetHeaders_(ss, sheetName, headers) {
       continue;
     }
     if (sheet.getLastRow() > 1) {
-      throw new Error(
-        'Sheet "' + sheetName + '" already has data and one of its existing headers does not match the expected layout. Fix headers manually before continuing.'
-      );
+      throw new Error('Sheet "' + sheetName + '" already has data and a header does not match. Fix headers manually.');
     }
     sheet.getRange(1, i + 1).setValue(headers[i]);
     existingHeaders[i] = headers[i];
@@ -1478,10 +1536,7 @@ function ensureSettingsSheet_(ss, sheetName, headers, defaultRows) {
   var sheet = ensureSheetHeaders_(ss, sheetName, headers);
   var existing = getObjectsFromSheet_(sheet);
   var existingMap = {};
-
-  for (var i = 0; i < existing.length; i++) {
-    existingMap[trim_(existing[i].key)] = i + 2;
-  }
+  for (var i = 0; i < existing.length; i++) existingMap[trim_(existing[i].key)] = i + 2;
 
   for (var r = 0; r < defaultRows.length; r++) {
     var key = defaultRows[r][0];
@@ -1494,17 +1549,8 @@ function ensureSettingsSheet_(ss, sheetName, headers, defaultRows) {
       sheet.appendRow([key, value]);
     }
   }
-
   autoResizeColumns_(sheet, headers.length);
   return sheet;
-}
-
-function headersMatch_(existingHeaders, expectedHeaders) {
-  if (existingHeaders.length !== expectedHeaders.length) return false;
-  for (var i = 0; i < expectedHeaders.length; i++) {
-    if (String(existingHeaders[i]) !== String(expectedHeaders[i])) return false;
-  }
-  return true;
 }
 
 function appendObjectRow_(sheet, headers, rowObject) {
@@ -1517,9 +1563,7 @@ function appendObjectRow_(sheet, headers, rowObject) {
 
 function getHeaders_(sheet) {
   var lastColumn = sheet.getLastColumn();
-  if (lastColumn === 0) {
-    throw new Error('Sheet has no headers: ' + sheet.getName());
-  }
+  if (lastColumn === 0) throw new Error('Sheet has no headers: ' + sheet.getName());
   return sheet.getRange(1, 1, 1, lastColumn).getValues()[0].map(String);
 }
 
@@ -1528,35 +1572,26 @@ function getObjectsFromSheet_(sheet) {
   if (values.length < 2) return [];
   var headers = values[0].map(String);
   var output = [];
-
   for (var r = 1; r < values.length; r++) {
     var obj = {};
-    for (var c = 0; c < headers.length; c++) {
-      obj[headers[c]] = values[r][c];
-    }
+    for (var c = 0; c < headers.length; c++) obj[headers[c]] = values[r][c];
     output.push(obj);
   }
-
   return output;
 }
 
 function autoResizeColumns_(sheet, count) {
-  for (var i = 1; i <= count; i++) {
-    sheet.autoResizeColumn(i);
-  }
+  for (var i = 1; i <= count; i++) sheet.autoResizeColumn(i);
 }
 
 function formatHeaderRow_(sheet) {
   if (!sheet || sheet.getLastColumn() === 0) return;
-  var header = sheet.getRange(1, 1, 1, sheet.getLastColumn());
-  header.setFontWeight('bold')
-    .setBackground('#2f4f3f')
-    .setFontColor('#ffffff')
-    .setWrap(true);
+  sheet.getRange(1, 1, 1, sheet.getLastColumn())
+    .setFontWeight('bold').setBackground('#2f4f3f').setFontColor('#ffffff').setWrap(true);
   sheet.setFrozenRows(1);
 }
 
-/* -------------------- Utility helpers -------------------- */
+/* ===== Utility helpers ===== */
 
 function validateRequired_(object, keys) {
   for (var i = 0; i < keys.length; i++) {
@@ -1577,40 +1612,27 @@ function trim_(value) {
 }
 
 function sanitizeFileName_(name) {
-  return String(name || 'Poster')
-    .replace(/[\\\/:*?"<>|#\[\]]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return String(name || 'Poster').replace(/[\\\/:*?"<>|#\[\]]/g, '').replace(/\s+/g, ' ').trim();
 }
 
-function isFilled_(value) {
-  return trim_(value) !== '';
-}
+function isFilled_(value) { return trim_(value) !== ''; }
 
 function areAllFilled_(values) {
-  for (var i = 0; i < values.length; i++) {
-    if (!isFilled_(values[i])) return false;
-  }
+  for (var i = 0; i < values.length; i++) { if (!isFilled_(values[i])) return false; }
   return true;
 }
 
 function uniqueCount_(values) {
   var seen = {};
-  for (var i = 0; i < values.length; i++) {
-    seen[trim_(values[i]).toLowerCase()] = true;
-  }
+  for (var i = 0; i < values.length; i++) seen[trim_(values[i]).toLowerCase()] = true;
   return Object.keys(seen).length;
 }
 
 function mergeObjects_(base, updates) {
   var merged = {};
   var key;
-  for (key in base) {
-    if (base.hasOwnProperty(key)) merged[key] = base[key];
-  }
-  for (key in updates) {
-    if (updates.hasOwnProperty(key)) merged[key] = updates[key];
-  }
+  for (key in base) { if (base.hasOwnProperty(key)) merged[key] = base[key]; }
+  for (key in updates) { if (updates.hasOwnProperty(key)) merged[key] = updates[key]; }
   return merged;
 }
 

@@ -67,7 +67,7 @@
         <h2 class="section-title">Mission Briefing</h2>
 
         <div class="briefing-box">
-          <div class="pill"><em id="briefingScientificName"></em></div>
+          <div class="pill" id="briefingCommonName"></div>
           <div class="pill" id="briefingBiome">Biome</div>
           <div class="pill" id="briefingRegion">Region</div>
 
@@ -76,6 +76,7 @@
         </div>
 
         <div class="btn-row">
+          <button class="btn btn-secondary" type="button" onclick="goBack('species')">← Back</button>
           <button id="briefingContinueBtn" class="btn btn-primary" type="button">Continue</button>
         </div>
       </section>
@@ -88,6 +89,11 @@
           <div class="field">
             <label for="commonNameAnswer">Common Name</label>
             <input id="commonNameAnswer" type="text" placeholder="Type the common name of your organism">
+          </div>
+
+          <div class="field">
+            <label for="scientificNameAnswer">Scientific Name</label>
+            <input id="scientificNameAnswer" type="text" placeholder="Example: Panthera tigris">
           </div>
 
           <div class="field">
@@ -122,6 +128,7 @@
         </div>
 
         <div class="btn-row">
+          <button class="btn btn-secondary" type="button" onclick="goBack('briefing')">← Back</button>
           <button id="saveEcologyBtn" class="btn btn-primary" type="button">Save and Continue</button>
         </div>
       </section>
@@ -155,6 +162,7 @@
         </div>
 
         <div class="btn-row">
+          <button class="btn btn-secondary" type="button" onclick="goBack('ecology')">← Back</button>
           <button id="saveThreatsBtn" class="btn btn-primary" type="button">Save and Continue</button>
         </div>
       </section>
@@ -181,6 +189,7 @@
         </div>
 
         <div class="btn-row">
+          <button class="btn btn-secondary" type="button" onclick="goBack('threats')">← Back</button>
           <button id="saveActionsBtn" class="btn btn-primary" type="button">Save and Continue</button>
         </div>
       </section>
@@ -190,11 +199,27 @@
         <p class="subtle">Finish your mission and submit your rescue report.</p>
 
         <div class="field">
+          <label>Choose a photo for your poster</label>
+          <div class="image-choice-grid" id="imageChoiceGrid">
+            <div class="image-choice" id="imageChoice0" onclick="selectPosterImage(0)">
+              <img id="posterImg0" alt="Species photo 1" referrerpolicy="no-referrer">
+            </div>
+            <div class="image-choice" id="imageChoice1" onclick="selectPosterImage(1)">
+              <img id="posterImg1" alt="Species photo 2" referrerpolicy="no-referrer">
+            </div>
+            <div class="image-choice" id="imageChoice2" onclick="selectPosterImage(2)">
+              <img id="posterImg2" alt="Species photo 3" referrerpolicy="no-referrer">
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
           <label for="whyItMatters">Why does this species matter?</label>
           <textarea id="whyItMatters" placeholder="Why should people care about protecting this species?"></textarea>
         </div>
 
         <div class="btn-row">
+          <button class="btn btn-secondary" type="button" onclick="goBack('actions')">← Back</button>
           <button id="finishMissionBtn" class="btn btn-primary" type="button">Finish Mission</button>
         </div>
       </section>
@@ -205,7 +230,8 @@
 
         <div id="submittedLinks" class="btn-row hidden">
           <a id="completeSlideLink" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">View Slide</a>
-          <a id="completePdfLink" class="btn btn-primary" target="_blank" rel="noopener noreferrer">Open PDF</a>
+          <a id="completePdfLink" class="btn btn-primary" target="_blank" rel="noopener noreferrer">Open Poster PDF</a>
+          <a id="completeTilePdfLink" class="btn btn-secondary hidden" target="_blank" rel="noopener noreferrer">Open Wall Tiles PDF</a>
         </div>
       </section>
     </div>

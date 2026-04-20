@@ -1,5 +1,5 @@
 <script>
-  var STORAGE_KEY = 'esrm_v12_draft';
+  var STORAGE_KEY = 'esrm_v13_draft';
 
   var state = {
     config: null,
@@ -7,8 +7,11 @@
     selectedSpecies: null,
     currentStage: 'login',
     generatingPoster: false,
-    submitMode: ''
+    submitMode: '',
+    selectedImageUrl: ''
   };
+
+  var savedAnswers = {};
 
   var stageOrder = ['login', 'species', 'briefing', 'ecology', 'threats', 'actions', 'final', 'submitted'];
 
@@ -21,6 +24,7 @@
   function wireButtons() {
     document.getElementById('startMissionBtn').addEventListener('click', handleStartMission);
     document.getElementById('briefingContinueBtn').addEventListener('click', function () {
+      saveAnswersForStage('briefing');
       showStage('ecology');
     });
     document.getElementById('saveEcologyBtn').addEventListener('click', handleSaveEcology);
@@ -37,13 +41,12 @@
   function wireDraftInputs() {
     var ids = [
       'firstName', 'lastName',
-      'commonNameAnswer', 'statusAnswer',
+      'commonNameAnswer', 'scientificNameAnswer', 'statusAnswer',
       'habitatType', 'dietType', 'adaptationType', 'ecosystemRole', 'ecologyExplanation',
       'threat1', 'threat1Reason', 'threat2', 'threat2Reason',
       'action1', 'action2', 'actionExplanation',
       'whyItMatters'
     ];
-
     for (var i = 0; i < ids.length; i++) {
       var el = document.getElementById(ids[i]);
       if (!el) continue;
@@ -51,6 +54,59 @@
       el.addEventListener('change', persistDraftState);
     }
   }
+
+  /* ===== Back navigation ===== */
+
+  function saveAnswersForStage(stage) {
+    savedAnswers[stage] = collectFieldValues();
+  }
+
+  function restoreAnswersForStage(stage) {
+    if (savedAnswers[stage]) {
+      applyFieldValues(savedAnswers[stage]);
+    }
+  }
+
+  function goBack(targetStage) {
+    clearStatus();
+    saveAnswersForStage(state.currentStage);
+    showStage(targetStage);
+    restoreAnswersForStage(targetStage);
+  }
+
+  /* ===== Image chooser ===== */
+
+  function loadPosterImageChoices(species) {
+    var urls = [
+      species ? species.image_option_1_url : '',
+      species ? species.image_option_2_url : '',
+      species ? species.image_option_3_url : ''
+    ];
+    state.selectedImageUrl = '';
+    for (var i = 0; i < 3; i++) {
+      var img = document.getElementById('posterImg' + i);
+      var card = document.getElementById('imageChoice' + i);
+      if (!img || !card) continue;
+      card.classList.remove('selected');
+      img.src = urls[i] || '';
+      img.onerror = (function(el) {
+        return function() { el.style.display = 'none'; };
+      })(img);
+    }
+  }
+
+  function selectPosterImage(index) {
+    var species = state.selectedSpecies;
+    if (!species) return;
+    var urls = [species.image_option_1_url, species.image_option_2_url, species.image_option_3_url];
+    state.selectedImageUrl = urls[index] || '';
+    for (var i = 0; i < 3; i++) {
+      var card = document.getElementById('imageChoice' + i);
+      if (card) card.classList.toggle('selected', i === index);
+    }
+  }
+
+  /* ===== Config loading ===== */
 
   function loadInitialConfig() {
     setBusy(true);
@@ -70,13 +126,11 @@
   function setBusy(isBusy, buttonId) {
     var overlay = document.getElementById('busyMessage');
     overlay.classList.toggle('hidden', !isBusy);
-
     if (buttonId) {
       var btn = document.getElementById(buttonId);
       if (btn) btn.disabled = isBusy;
     }
   }
-
 
   function populateDropdowns(dropdowns) {
     fillSelect('statusAnswer', dropdowns.conservationStatuses);
@@ -84,15 +138,14 @@
     fillSelect('dietType', dropdowns.dietTypes);
     fillSelect('threat1', dropdowns.threats);
     fillSelect('threat2', dropdowns.threats);
-
     fillSelect('action1', dropdowns.actions);
     fillSelect('action2', dropdowns.actions);
   }
 
   function fillSelect(id, values) {
     var select = document.getElementById(id);
+    if (!select) return;
     select.innerHTML = '<option value="">Choose one</option>';
-
     for (var i = 0; i < values.length; i++) {
       var option = document.createElement('option');
       option.value = values[i];
@@ -101,15 +154,15 @@
     }
   }
 
+  /* ===== Species gallery ===== */
+
   function renderSpeciesGallery(speciesList) {
     var grid = document.getElementById('speciesGrid');
     grid.innerHTML = '';
-
     for (var i = 0; i < speciesList.length; i++) {
       (function (species) {
         var card = document.createElement('div');
         card.className = 'species-card';
-
         appendBestSpeciesImage(card, species);
 
         var body = document.createElement('div');
@@ -127,14 +180,11 @@
         btn.className = 'btn btn-primary choose-species-btn';
         btn.type = 'button';
         btn.textContent = 'Choose This Species';
-        btn.addEventListener('click', function () {
-          chooseSpecies(species.species_id);
-        });
+        btn.addEventListener('click', function () { chooseSpecies(species.species_id); });
 
         body.appendChild(name);
         body.appendChild(biome);
         body.appendChild(btn);
-
         card.appendChild(body);
         grid.appendChild(card);
       })(speciesList[i]);
@@ -142,11 +192,7 @@
   }
 
   function appendBestSpeciesImage(card, species) {
-    var urls = [
-      species.image_option_1_url,
-      species.image_option_2_url,
-      species.image_option_3_url
-    ];
+    var urls = [species.image_option_1_url, species.image_option_2_url, species.image_option_3_url];
     tryImageAtIndex(card, species.common_name, urls, 0);
   }
 
@@ -155,15 +201,12 @@
       replaceWithSpeciesPlaceholder(card, commonName);
       return;
     }
-
     var img = document.createElement('img');
     img.alt = commonName;
     img.referrerPolicy = 'no-referrer';
     img.loading = 'eager';
     img.onerror = function () {
-      if (img.parentNode === card) {
-        card.removeChild(img);
-      }
+      if (img.parentNode === card) card.removeChild(img);
       tryImageAtIndex(card, commonName, urls, index + 1);
     };
     img.src = urls[index];
@@ -172,28 +215,25 @@
 
   function replaceWithSpeciesPlaceholder(card, commonName) {
     var firstChild = card.firstChild;
-    if (firstChild && firstChild.tagName === 'IMG') {
-      card.removeChild(firstChild);
-    }
+    if (firstChild && firstChild.tagName === 'IMG') card.removeChild(firstChild);
     var placeholder = document.createElement('div');
     placeholder.className = 'species-placeholder';
     placeholder.textContent = commonName + ' image';
     card.insertBefore(placeholder, card.firstChild);
   }
 
+  /* ===== Mission flow handlers ===== */
+
   function handleStartMission() {
     clearStatus();
-
     var payload = {
       firstName: document.getElementById('firstName').value.trim(),
       lastName: document.getElementById('lastName').value.trim()
     };
-
     if (!payload.firstName || !payload.lastName) {
       showError('Please enter your first name and last name.');
       return;
     }
-
     setBusy(true, 'startMissionBtn');
     google.script.run
       .withSuccessHandler(function (result) {
@@ -203,22 +243,15 @@
         persistDraftState();
         setBusy(false, 'startMissionBtn');
       })
-      .withFailureHandler(function (error) {
-        handleErrorWithButton(error, 'startMissionBtn');
-      })
+      .withFailureHandler(function (error) { handleErrorWithButton(error, 'startMissionBtn'); })
       .startMission(payload);
   }
 
   function chooseSpecies(speciesId) {
     clearStatus();
-    if (!state.studentKey) {
-      showError('Please start the mission first.');
-      return;
-    }
-
+    if (!state.studentKey) { showError('Please start the mission first.'); return; }
     toggleSpeciesButtons(true);
     setBusy(true);
-
     google.script.run
       .withSuccessHandler(function (result) {
         state.selectedSpecies = result.species;
@@ -238,38 +271,30 @@
 
   function toggleSpeciesButtons(disabled) {
     var buttons = document.querySelectorAll('.choose-species-btn');
-    for (var i = 0; i < buttons.length; i++) {
-      buttons[i].disabled = disabled;
-    }
+    for (var i = 0; i < buttons.length; i++) buttons[i].disabled = disabled;
   }
 
   function populateBriefing(species) {
-    document.getElementById('briefingScientificName').textContent = species.scientific_name || '';
+    var commonNameEl = document.getElementById('briefingCommonName');
+    if (commonNameEl) commonNameEl.textContent = species.common_name || '';
     document.getElementById('briefingBiome').textContent = species.biome || '';
     document.getElementById('briefingRegion').textContent = species.region || '';
-    document.getElementById('briefingText').textContent = 'Use the research links to identify this organism\'s common name and conservation classification. Then find where it lives, how it survives, what threatens it, and how people can help.';
-
-    var links = document.getElementById('briefingLinks');
-    populateLinkContainer(links, species);
+    document.getElementById('briefingText').textContent = 'Use the research links to find out about this organism. Then fill in what you learn on the next screens.';
+    populateLinkContainer(document.getElementById('briefingLinks'), species);
   }
 
   function updateReferencePanel(species) {
     var panel = document.getElementById('missionReference');
-    if (!species) {
-      panel.classList.add('hidden');
-      return;
-    }
-
-    document.getElementById('referenceSpeciesName').textContent = 'Mission Reference';
+    if (!species) { panel.classList.add('hidden'); return; }
+    document.getElementById('referenceSpeciesName').textContent = species.common_name || 'Mission Reference';
     document.getElementById('referenceSpeciesMeta').textContent =
-      [species.scientific_name, species.biome, species.region].join(' • ');
+      [species.scientific_name, species.biome, species.region].filter(Boolean).join(' • ');
     populateLinkContainer(document.getElementById('referenceLinks'), species);
     panel.classList.remove('hidden');
   }
 
   function populateLinkContainer(container, species) {
     container.innerHTML = '';
-
     if (species.research_link_1) {
       var a = document.createElement('a');
       a.href = species.research_link_1;
@@ -278,21 +303,20 @@
       a.textContent = 'Research Link';
       container.appendChild(a);
     }
-
     var googleUrl = 'https://www.google.com/search?q=' + encodeURIComponent((species.common_name || '') + ' endangered species conservation');
     var googleLink = document.createElement('a');
     googleLink.href = googleUrl;
     googleLink.target = '_blank';
     googleLink.rel = 'noopener noreferrer';
-    googleLink.textContent = 'Find your own source! Careful for accuracy!';
+    googleLink.textContent = 'Search for more sources';
     container.appendChild(googleLink);
   }
 
   function handleSaveEcology() {
     clearStatus();
-
     var payload = {
       commonNameAnswer: document.getElementById('commonNameAnswer').value.trim(),
+      scientificNameAnswer: document.getElementById('scientificNameAnswer').value.trim(),
       statusAnswer: document.getElementById('statusAnswer').value,
       habitatType: document.getElementById('habitatType').value,
       dietType: document.getElementById('dietType').value,
@@ -300,12 +324,13 @@
       ecosystemRole: document.getElementById('ecosystemRole').value.trim(),
       ecologyExplanation: document.getElementById('ecologyExplanation').value.trim()
     };
-
-    if (!payload.commonNameAnswer || !payload.statusAnswer || !payload.habitatType || !payload.dietType || !payload.adaptationType || !payload.ecosystemRole || !payload.ecologyExplanation) {
-      showError('Please complete all step 2 fields before continuing.');
+    if (!payload.commonNameAnswer || !payload.scientificNameAnswer || !payload.statusAnswer ||
+        !payload.habitatType || !payload.dietType || !payload.adaptationType ||
+        !payload.ecosystemRole || !payload.ecologyExplanation) {
+      showError('Please complete all fields before continuing.');
       return;
     }
-
+    saveAnswersForStage('ecology');
     setBusy(true, 'saveEcologyBtn');
     google.script.run
       .withSuccessHandler(function () {
@@ -313,32 +338,27 @@
         persistDraftState();
         setBusy(false, 'saveEcologyBtn');
       })
-      .withFailureHandler(function (error) {
-        handleErrorWithButton(error, 'saveEcologyBtn');
-      })
+      .withFailureHandler(function (error) { handleErrorWithButton(error, 'saveEcologyBtn'); })
       .saveEcology(state.studentKey, payload);
   }
 
   function handleSaveThreats() {
     clearStatus();
-
     var payload = {
       threat1: document.getElementById('threat1').value,
       threat1Reason: document.getElementById('threat1Reason').value.trim(),
       threat2: document.getElementById('threat2').value,
       threat2Reason: document.getElementById('threat2Reason').value.trim()
     };
-
     if (!payload.threat1 || !payload.threat1Reason || !payload.threat2 || !payload.threat2Reason) {
       showError('Please choose 2 threats and explain each one.');
       return;
     }
-
     if (uniqueLowerCount([payload.threat1, payload.threat2]) !== 2) {
       showError('Please choose 2 different threats.');
       return;
     }
-
+    saveAnswersForStage('threats');
     setBusy(true, 'saveThreatsBtn');
     google.script.run
       .withSuccessHandler(function () {
@@ -346,31 +366,26 @@
         persistDraftState();
         setBusy(false, 'saveThreatsBtn');
       })
-      .withFailureHandler(function (error) {
-        handleErrorWithButton(error, 'saveThreatsBtn');
-      })
+      .withFailureHandler(function (error) { handleErrorWithButton(error, 'saveThreatsBtn'); })
       .saveThreats(state.studentKey, payload);
   }
 
   function handleSaveActions() {
     clearStatus();
-
     var payload = {
       action1: document.getElementById('action1').value,
       action2: document.getElementById('action2').value,
       actionExplanation: document.getElementById('actionExplanation').value.trim()
     };
-
     if (!payload.action1 || !payload.action2 || !payload.actionExplanation) {
       showError('Please choose 2 actions and explain how they help.');
       return;
     }
-
     if (uniqueLowerCount([payload.action1, payload.action2]) !== 2) {
       showError('Please choose 2 different conservation actions.');
       return;
     }
-
+    saveAnswersForStage('actions');
     setBusy(true, 'saveActionsBtn');
     google.script.run
       .withSuccessHandler(function () {
@@ -378,22 +393,19 @@
         persistDraftState();
         setBusy(false, 'saveActionsBtn');
       })
-      .withFailureHandler(function (error) {
-        handleErrorWithButton(error, 'saveActionsBtn');
-      })
+      .withFailureHandler(function (error) { handleErrorWithButton(error, 'saveActionsBtn'); })
       .saveActions(state.studentKey, payload);
   }
 
   function handleFinishMission() {
     clearStatus();
-
     var whyItMatters = document.getElementById('whyItMatters').value.trim();
     if (!whyItMatters) {
       showError('Please explain why this species matters.');
       return;
     }
     state.generatingPoster = true;
-    showSuccess('<span class="spinner"></span>Generating your poster...');
+    showSuccess('<span class="spinner"></span>Please wait, making your MASTERPIECE!');
     document.getElementById('finishMissionBtn').disabled = true;
 
     google.script.run
@@ -408,15 +420,15 @@
         handleErrorWithButton(error, 'finishMissionBtn');
       })
       .finishMission(state.studentKey, {
-        whyItMatters: whyItMatters
+        whyItMatters: whyItMatters,
+        selectedImageUrl: state.selectedImageUrl || ''
       });
   }
 
-  function openSubmitModal(mode) {
-    if (!state.studentKey || state.currentStage === 'submitted') {
-      return;
-    }
+  /* ===== Emergency submit ===== */
 
+  function openSubmitModal(mode) {
+    if (!state.studentKey || state.currentStage === 'submitted') return;
     state.submitMode = mode;
     document.getElementById('submitModalTitle').textContent =
       mode === 'emergency' ? 'Emergency Submit?' : 'Submit Mission?';
@@ -433,16 +445,13 @@
   }
 
   function confirmModalSubmit() {
-    if (state.submitMode === 'emergency') {
-      handleEmergencySubmit();
-    }
+    if (state.submitMode === 'emergency') handleEmergencySubmit();
   }
 
   function handleEmergencySubmit() {
     closeSubmitModal();
     showSuccess('<span class="spinner"></span>Submitting your current work...');
     document.getElementById('emergencySubmitBtn').disabled = true;
-
     google.script.run
       .withSuccessHandler(function (result) {
         document.getElementById('emergencySubmitBtn').disabled = false;
@@ -455,47 +464,43 @@
       .emergencySubmitMission(state.studentKey);
   }
 
+  /* ===== Submission result handling ===== */
+
   function handleSubmissionResult(result, mode) {
     state.currentStage = 'submitted';
     showEmergencyButton(false);
 
     var warning = result && result.warning ? result.warning : '';
-    var message;
-
-    if (mode === 'emergency') {
-      message = warning || 'Emergency submit complete. Show your teacher.';
-    } else if (warning) {
-      message = warning;
-    } else {
-      message = 'Mission complete. Your rescue poster has been submitted.';
-    }
+    var message = mode === 'emergency'
+      ? (warning || 'Emergency submit complete. Show your teacher.')
+      : (warning || 'Mission complete. Your rescue poster has been submitted.');
 
     document.getElementById('submittedMessage').textContent = message;
 
     var hasSlide = !!(result && result.slideUrl);
     var hasPdf = !!(result && result.pdfUrl);
+    var hasTilePdf = !!(result && result.tilePdfUrl);
     var canShowLinks = !!(result && result.studentCanViewFiles);
 
     document.getElementById('submittedLinks').classList.toggle('hidden', !(canShowLinks && (hasSlide || hasPdf)));
     document.getElementById('completeSlideLink').classList.toggle('hidden', !(canShowLinks && hasSlide));
     document.getElementById('completePdfLink').classList.toggle('hidden', !(canShowLinks && hasPdf));
+    document.getElementById('completeTilePdfLink').classList.toggle('hidden', !(canShowLinks && hasTilePdf));
 
-    if (canShowLinks && hasSlide) {
-      document.getElementById('completeSlideLink').href = result.slideUrl;
-    }
-    if (canShowLinks && hasPdf) {
-      document.getElementById('completePdfLink').href = result.pdfUrl;
-    }
+    if (canShowLinks && hasSlide) document.getElementById('completeSlideLink').href = result.slideUrl;
+    if (canShowLinks && hasPdf) document.getElementById('completePdfLink').href = result.pdfUrl;
+    if (canShowLinks && hasTilePdf) document.getElementById('completeTilePdfLink').href = result.tilePdfUrl;
 
     showStage('submitted');
     showSuccess(message);
     clearDraftState();
   }
 
+  /* ===== Stage navigation ===== */
+
   function showStage(stageName) {
     state.currentStage = stageName;
-    var i;
-    for (i = 0; i < stageOrder.length; i++) {
+    for (var i = 0; i < stageOrder.length; i++) {
       document.getElementById('stage-' + stageOrder[i]).classList.toggle('hidden', stageOrder[i] !== stageName);
     }
     updateProgress(stageName);
@@ -503,6 +508,9 @@
       document.getElementById('missionReference').classList.add('hidden');
     } else if (state.selectedSpecies) {
       document.getElementById('missionReference').classList.remove('hidden');
+    }
+    if (stageName === 'final' && state.selectedSpecies) {
+      loadPosterImageChoices(state.selectedSpecies);
     }
     persistDraftState();
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -518,6 +526,8 @@
   function showEmergencyButton(showIt) {
     document.getElementById('emergencySubmitBtn').classList.toggle('hidden', !showIt);
   }
+
+  /* ===== Status messages ===== */
 
   function showError(message) {
     var box = document.getElementById('statusBox');
@@ -551,6 +561,8 @@
     handleError(error);
   }
 
+  /* ===== Draft persistence ===== */
+
   function persistDraftState() {
     var draft = {
       studentKey: state.studentKey,
@@ -558,29 +570,15 @@
       currentStage: state.currentStage || 'login',
       fields: collectFieldValues()
     };
-
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
-    } catch (e) {}
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(draft)); } catch (e) {}
   }
 
   function restoreDraftState() {
     var raw;
-    try {
-      raw = localStorage.getItem(STORAGE_KEY);
-    } catch (e) {
-      raw = '';
-    }
-
+    try { raw = localStorage.getItem(STORAGE_KEY); } catch (e) { raw = ''; }
     if (!raw) return;
-
     var draft;
-    try {
-      draft = JSON.parse(raw);
-    } catch (e2) {
-      return;
-    }
-
+    try { draft = JSON.parse(raw); } catch (e2) { return; }
     if (!draft || !draft.fields) return;
 
     applyFieldValues(draft.fields);
@@ -588,29 +586,19 @@
     showEmergencyButton(!!state.studentKey);
 
     if (!draft.selectedSpeciesId) {
-      if (draft.currentStage === 'species' && state.studentKey) {
-        showStage('species');
-      }
+      if (draft.currentStage === 'species' && state.studentKey) showStage('species');
       return;
     }
 
     var species = findSpeciesInConfig(draft.selectedSpeciesId);
-    if (!species) {
-      return;
-    }
+    if (!species) return;
 
     state.selectedSpecies = species;
     populateBriefing(species);
     updateReferencePanel(species);
 
-    if (draft.currentStage === 'submitted') {
-      clearDraftState();
-      return;
-    }
-
-    if (stageOrder.indexOf(draft.currentStage) !== -1) {
-      showStage(draft.currentStage);
-    }
+    if (draft.currentStage === 'submitted') { clearDraftState(); return; }
+    if (stageOrder.indexOf(draft.currentStage) !== -1) showStage(draft.currentStage);
   }
 
   function collectFieldValues() {
@@ -618,6 +606,7 @@
       firstName: getValue('firstName'),
       lastName: getValue('lastName'),
       commonNameAnswer: getValue('commonNameAnswer'),
+      scientificNameAnswer: getValue('scientificNameAnswer'),
       statusAnswer: getValue('statusAnswer'),
       habitatType: getValue('habitatType'),
       dietType: getValue('dietType'),
@@ -637,8 +626,9 @@
 
   function applyFieldValues(fields) {
     for (var key in fields) {
-      if (fields.hasOwnProperty(key) && document.getElementById(key)) {
-        document.getElementById(key).value = fields[key] || '';
+      if (fields.hasOwnProperty(key)) {
+        var el = document.getElementById(key);
+        if (el) el.value = fields[key] || '';
       }
     }
   }
@@ -649,25 +639,21 @@
   }
 
   function clearDraftState() {
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-    } catch (e) {}
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
   }
+
+  /* ===== Utilities ===== */
 
   function uniqueLowerCount(values) {
     var seen = {};
-    var i;
-    for (i = 0; i < values.length; i++) {
-      seen[String(values[i]).toLowerCase()] = true;
-    }
+    for (var i = 0; i < values.length; i++) seen[String(values[i]).toLowerCase()] = true;
     return Object.keys(seen).length;
   }
 
   function findSpeciesInConfig(speciesId) {
     if (!state.config || !state.config.species) return null;
     var list = state.config.species;
-    var i;
-    for (i = 0; i < list.length; i++) {
+    for (var i = 0; i < list.length; i++) {
       if (list[i].species_id === speciesId) return list[i];
     }
     return null;
