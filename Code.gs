@@ -217,6 +217,7 @@ function getInitialConfig() {
     setupProjectSheets();
   }
   seedDefaultSpeciesMasterIfNeeded_();
+  patchMissingSpeciesImageData_();
 
   var settings = getSettingsMap_();
   var species = getSpeciesData_();
@@ -283,6 +284,12 @@ function startMission(student) {
 
   appendObjectRow_(sheet, headers, rowObject);
   return { studentKey: studentKey, currentStage: APP.stages.species };
+}
+
+function getEmbeddableImagePreview(url) {
+  var text = trim_(url);
+  if (!text) return '';
+  return fetchImagePreviewDataUri_(text);
 }
 
 function saveSpeciesChoice(studentKey, speciesId) {
@@ -404,7 +411,7 @@ function finishMission(studentKey, payload) {
   updateSubmissionByStudentKey_(studentKey, prePosterUpdates);
 
   var submission = getSubmissionByStudentKey_(studentKey);
-  var output = { slideUrl: '', pdfUrl: '', tilePdfUrl: '', posterFileId: '', pdfFileId: '', tilePdfFileId: '', warning: '', studentCanViewFiles: false };
+  var output = { slideUrl: '', pdfUrl: '', posterFileId: '', pdfFileId: '', warning: '', studentCanViewFiles: false };
 
   try {
     output = generatePosterForSubmission_(submission);
@@ -419,8 +426,8 @@ function finishMission(studentKey, payload) {
     poster_slide_url: output.slideUrl || '',
     pdf_file_id: output.pdfFileId || '',
     poster_pdf_url: output.pdfUrl || '',
-    tile_pdf_file_id: output.tilePdfFileId || '',
-    tile_pdf_url: output.tilePdfUrl || '',
+    tile_pdf_file_id: '',
+    tile_pdf_url: '',
     mission_stage: APP.stages.submitted,
     submission_status: output.warning ? 'Submitted - Poster Error' : 'Submitted',
     submission_message: output.warning || 'Submitted successfully.',
@@ -437,7 +444,6 @@ function finishMission(studentKey, payload) {
     submissionComplete: true,
     slideUrl: output.slideUrl || '',
     pdfUrl: output.pdfUrl || '',
-    tilePdfUrl: output.tilePdfUrl || '',
     studentCanViewFiles: output.studentCanViewFiles || false,
     warning: output.warning || ''
   };
@@ -465,8 +471,7 @@ function emergencySubmitMission(studentKey) {
     warning: 'Emergency submit saved your current work. Tell your teacher.',
     studentCanViewFiles: false,
     slideUrl: '',
-    pdfUrl: '',
-    tilePdfUrl: ''
+    pdfUrl: ''
   };
 }
 
@@ -545,7 +550,6 @@ function posterA_drawPhotoCol_(slide, submission) {
 
   pText_(slide, 'QUICK FACTS', 14, 219, 176, 13,
     { font: 'Arial', size: 8, bold: true, color: '#81c784' });
-  pLine_(slide, 14, 232, 176, '#2e7d5b');
 
   var facts = [
     ['Habitat:', submission.habitat_type || '\u2014'],
@@ -575,7 +579,6 @@ function posterA_drawEcologyCol_(slide, submission) {
 
   pText_(slide, 'ECOLOGICAL EXPLANATION', 212, 145, 234, 13,
     { font: 'Arial', size: 8, bold: true, color: '#64b5f6' });
-  pLine_(slide, 212, 159, 234, '#1565c0');
   pText_(slide, submission.ecology_explanation || '', 212, 161, 234, 104,
     { font: 'Arial', size: 8, color: '#bbdefb' });
 }
@@ -720,14 +723,9 @@ function tileC_draw_(slide, submission, imageUrl) {
 
   if (imageUrl) {
     try {
-      var resp = UrlFetchApp.fetch(imageUrl, { muteHttpExceptions: true, followRedirects: true, headers: { 'User-Agent': 'Mozilla/5.0' } });
-      if (resp.getResponseCode() >= 200 && resp.getResponseCode() < 300) {
-        slide.insertImage(resp.getBlob(), 8, 10, 704, 280);
-      } else {
-        try { slide.insertImage(imageUrl, 8, 10, 704, 280); } catch (e2) {}
-      }
+      insertSlideImageIntoBox_(slide, imageUrl, 8, 10, 704, 280);
     } catch (imgErr) {
-      try { slide.insertImage(imageUrl, 8, 10, 704, 280); } catch (e2) {}
+      Logger.log('tileC image insert failed: ' + imgErr);
     }
   }
 
@@ -865,31 +863,9 @@ function generatePosterForSubmission_(submission) {
     warnings.push('Poster was created, but PDF export failed.');
   }
 
-  var tileName = sanitizeFileName_(['Wall Tiles', submission.common_name || 'Species', studentName || 'Student'].join(' - '));
-  var tileFile = null;
-  var tilePdfFile = null;
-  try {
-    var tileResult = buildTilePdf_(outputFolder, tileName, submission);
-    tileFile = tileResult.file;
-    if (tileResult.warning) warnings.push(tileResult.warning);
-  } catch (tileError) {
-    Logger.log('Tile build failed: ' + tileError);
-    warnings.push('Poster was created, but the wall-tile file could not be generated.');
-  }
-
-  if (tileFile) {
-    try {
-      tilePdfFile = exportSlidesFileAsPdfWithRetry_(tileFile.getId(), tileName, outputFolder);
-    } catch (tilePdfError) {
-      Logger.log('Tile PDF export failed: ' + tilePdfError);
-    }
-  }
-
   try {
     posterFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     if (pdfFile) pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    if (tileFile) tileFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    if (tilePdfFile) tilePdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   } catch (shareError) {
     Logger.log('Sharing update failed: ' + shareError);
   }
@@ -899,8 +875,6 @@ function generatePosterForSubmission_(submission) {
     pdfUrl: pdfFile ? pdfFile.getUrl() : '',
     posterFileId: posterFile.getId(),
     pdfFileId: pdfFile ? pdfFile.getId() : '',
-    tilePdfUrl: tilePdfFile ? tilePdfFile.getUrl() : '',
-    tilePdfFileId: tilePdfFile ? tilePdfFile.getId() : '',
     warning: warnings.join(' '),
     studentCanViewFiles: !!posterFile.getId()
   };
@@ -1041,21 +1015,27 @@ function hasConfiguredDriveId_(value) {
 }
 
 function insertSlideImageFromUrl_(slide, imageUrl) {
+  return insertSlideImageIntoBox_(
+    slide,
+    imageUrl,
+    APP.posterImageBox.x,
+    APP.posterImageBox.y,
+    APP.posterImageBox.width,
+    APP.posterImageBox.height
+  );
+}
+
+function insertSlideImageIntoBox_(slide, imageUrl, x, y, width, height) {
   if (!imageUrl) return false;
-  try {
-    var response = UrlFetchApp.fetch(imageUrl, {
-      muteHttpExceptions: true, followRedirects: true,
-      headers: { 'User-Agent': 'Mozilla/5.0' }
-    });
-    if (response.getResponseCode() >= 200 && response.getResponseCode() < 300) {
-      slide.insertImage(response.getBlob(), APP.posterImageBox.x, APP.posterImageBox.y, APP.posterImageBox.width, APP.posterImageBox.height);
-      return true;
-    }
-  } catch (error) {
-    Logger.log('UrlFetch image insert failed. Trying direct URL. ' + error);
+  var blob = getImageBlobFromSource_(imageUrl);
+  if (blob) {
+    slide.insertImage(blob, x, y, width, height);
+    return true;
   }
+
+  var fallbackUrl = normalizeImageUrlForBrowser_(imageUrl) || trim_(imageUrl);
   try {
-    slide.insertImage(imageUrl, APP.posterImageBox.x, APP.posterImageBox.y, APP.posterImageBox.width, APP.posterImageBox.height);
+    slide.insertImage(fallbackUrl, x, y, width, height);
     return true;
   } catch (fallbackError) {
     Logger.log('Image insert failed for URL: ' + imageUrl + ' :: ' + fallbackError);
@@ -1251,6 +1231,124 @@ function wikiFileUrl_(fileName) {
   return 'https://commons.wikimedia.org/wiki/Special:FilePath/' + encodeURIComponent(fileName);
 }
 
+function driveThumbnailUrl_(fileId) {
+  return 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(fileId) + '&sz=w1600';
+}
+
+function extractDriveFileIdFromUrl_(url) {
+  var text = trim_(url);
+  if (!text) return '';
+  var patterns = [
+    /[?&]id=([a-zA-Z0-9_-]{10,})/i,
+    /\/d\/([a-zA-Z0-9_-]{10,})/i
+  ];
+  for (var i = 0; i < patterns.length; i++) {
+    var match = text.match(patterns[i]);
+    if (match && match[1]) return match[1];
+  }
+  return '';
+}
+
+function extractWikimediaFileName_(url) {
+  var text = trim_(url);
+  if (!text) return '';
+  var match = text.match(/(?:commons\.wikimedia|[a-z-]+\.wikipedia)\.org\/wiki\/(?:Special:FilePath\/|File:)([^?#]+)/i);
+  if (!match || !match[1]) return '';
+  try {
+    return decodeURIComponent(match[1]).replace(/_/g, ' ');
+  } catch (e) {
+    return match[1].replace(/_/g, ' ');
+  }
+}
+
+function normalizeImageUrlForBrowser_(url) {
+  var text = trim_(url);
+  if (!text) return '';
+  if (/^data:image\//i.test(text)) return text;
+
+  var driveFileId = extractDriveFileIdFromUrl_(text);
+  if (driveFileId) return driveThumbnailUrl_(driveFileId);
+
+  var wikiFileName = extractWikimediaFileName_(text);
+  if (wikiFileName) return wikiFileUrl_(wikiFileName);
+
+  if (/dropbox\.com/i.test(text)) {
+    if (/[?&]raw=1\b/i.test(text)) return text;
+    if (/[?&]dl=0\b/i.test(text)) {
+      return text.replace(/([?&])dl=0\b/i, '$1raw=1');
+    }
+    return text + (text.indexOf('?') === -1 ? '?raw=1' : '&raw=1');
+  }
+
+  return text;
+}
+
+function getImageBlobFromDriveFileId_(fileId) {
+  if (!fileId) return null;
+  try {
+    var blob = DriveApp.getFileById(fileId).getBlob();
+    return isImageBlob_(blob) ? blob : null;
+  } catch (error) {
+    Logger.log('Drive image blob lookup failed for file ID ' + fileId + ': ' + error);
+    return null;
+  }
+}
+
+function fetchImageBlobFromHttpUrl_(url) {
+  if (!/^https?:\/\//i.test(trim_(url))) return null;
+  try {
+    var response = UrlFetchApp.fetch(url, {
+      muteHttpExceptions: true,
+      followRedirects: true,
+      headers: { 'User-Agent': 'Mozilla/5.0' }
+    });
+    if (response.getResponseCode() < 200 || response.getResponseCode() >= 300) return null;
+
+    var blob = response.getBlob();
+    return isImageBlob_(blob) ? blob : null;
+  } catch (error) {
+    Logger.log('HTTP image fetch failed for URL: ' + url + ' :: ' + error);
+    return null;
+  }
+}
+
+function isImageBlob_(blob) {
+  if (!blob) return false;
+  var contentType = trim_(blob.getContentType() || '').toLowerCase();
+  return !contentType || contentType.indexOf('image/') === 0;
+}
+
+function getImageBlobFromSource_(url) {
+  var text = trim_(url);
+  if (!text) return null;
+  if (/^data:image\//i.test(text)) return null;
+
+  var driveFileId = extractDriveFileIdFromUrl_(text);
+  if (driveFileId) {
+    var driveBlob = getImageBlobFromDriveFileId_(driveFileId);
+    if (driveBlob) return driveBlob;
+  }
+
+  var normalizedUrl = normalizeImageUrlForBrowser_(text);
+  var normalizedBlob = fetchImageBlobFromHttpUrl_(normalizedUrl);
+  if (normalizedBlob) return normalizedBlob;
+
+  if (normalizedUrl !== text) return fetchImageBlobFromHttpUrl_(text);
+  return null;
+}
+
+function fetchImagePreviewDataUri_(url) {
+  var normalizedUrl = normalizeImageUrlForBrowser_(url);
+  if (!normalizedUrl) return '';
+  if (/^data:image\//i.test(normalizedUrl)) return normalizedUrl;
+
+  var blob = getImageBlobFromSource_(url);
+  if (!blob) return '';
+
+  var contentType = trim_(blob.getContentType() || '') || 'image/jpeg';
+  return 'data:' + contentType + ';base64,' + Utilities.base64Encode(blob.getBytes());
+}
+
 function getCuratedImageSetForSpecies_(speciesId) {
   var fileNameMap = {
     'hawksbill-turtle': ['Hawksbill Turtle.jpg', 'Hawksbill sea turtle.jpg', 'Hawksbill turtle off the coast of Saba.jpg'],
@@ -1295,18 +1393,24 @@ function shouldBackfillImageValue_(value) {
 }
 
 function isUsableSpeciesImageUrl_(url) {
-  var text = trim_(url);
+  var text = normalizeImageUrlForBrowser_(url);
   if (!text) return false;
   if (shouldBackfillImageValue_(text)) return false;
   return /^https?:\/\//i.test(text);
 }
 
 function resolveSpeciesImageSet_(speciesId, commonName, rawUrls) {
-  var curated = getCuratedImageSetForSpecies_(speciesId);
-  if (curated && curated.length === 3) return curated;
-  var validRaw = rawUrls.filter(function(u) { return isUsableSpeciesImageUrl_(u); }).map(function(u) { return trim_(u); });
+  var validRaw = rawUrls
+    .map(function(u) { return normalizeImageUrlForBrowser_(u); })
+    .filter(function(u) { return isUsableSpeciesImageUrl_(u); })
+    .map(function(u) { return trim_(u); });
   while (validRaw.length && validRaw.length < 3) validRaw.push(validRaw[validRaw.length - 1]);
   if (validRaw.length >= 3) return validRaw.slice(0, 3);
+
+  var curated = getCuratedImageSetForSpecies_(speciesId).map(function(u) { return normalizeImageUrlForBrowser_(u); });
+  while (curated.length && curated.length < 3) curated.push(curated[curated.length - 1]);
+  if (curated.length >= 3) return curated.slice(0, 3);
+
   return getFallbackImageSetForSpecies_(speciesId, commonName);
 }
 
@@ -1320,10 +1424,14 @@ function seedDefaultSpeciesMasterIfNeeded_() {
   var headers = getHeaders_(sheet);
   for (var i = 0; i < defaults.length; i++) {
     var rowObject = mergeObjects_(defaults[i], {});
-    var fallbackImages = getFallbackImageSetForSpecies_(rowObject.species_id, rowObject.common_name);
-    rowObject.image_option_1_url = rowObject.image_option_1_url || fallbackImages[0];
-    rowObject.image_option_2_url = rowObject.image_option_2_url || fallbackImages[1];
-    rowObject.image_option_3_url = rowObject.image_option_3_url || fallbackImages[2];
+    var resolvedImages = resolveSpeciesImageSet_(rowObject.species_id, rowObject.common_name, [
+      rowObject.image_option_1_url,
+      rowObject.image_option_2_url,
+      rowObject.image_option_3_url
+    ]);
+    rowObject.image_option_1_url = resolvedImages[0];
+    rowObject.image_option_2_url = resolvedImages[1];
+    rowObject.image_option_3_url = resolvedImages[2];
     appendObjectRow_(sheet, headers, rowObject);
   }
 }
@@ -1332,24 +1440,31 @@ function patchMissingSpeciesImageData_() {
   var ss = getSpreadsheet_();
   var sheet = ss.getSheetByName(APP.sheetNames.species);
   var data = getObjectsFromSheet_(sheet);
-  var headers = getHeaders_(sheet);
   if (!data.length) return;
 
-  var imageHeaders = ['image_option_1_url', 'image_option_2_url', 'image_option_3_url'];
+  var imageColumnStart = getHeaders_(sheet).indexOf('image_option_1_url') + 1;
+  if (!imageColumnStart) return;
+
+  var pendingUpdates = [];
   for (var i = 0; i < data.length; i++) {
     if (!trim_(data[i].species_id)) continue;
     var resolvedImages = resolveSpeciesImageSet_(data[i].species_id, data[i].common_name, [
       data[i].image_option_1_url, data[i].image_option_2_url, data[i].image_option_3_url
     ]);
-    for (var j = 0; j < imageHeaders.length; j++) {
-      var colIndex = headers.indexOf(imageHeaders[j]);
-      if (colIndex === -1) continue;
-      if (trim_(data[i][imageHeaders[j]]) !== resolvedImages[j]) {
-        sheet.getRange(i + 2, colIndex + 1).setValue(resolvedImages[j]);
-      }
+    var currentImages = [
+      trim_(data[i].image_option_1_url),
+      trim_(data[i].image_option_2_url),
+      trim_(data[i].image_option_3_url)
+    ];
+    if (currentImages.join('\n') !== resolvedImages.join('\n')) {
+      pendingUpdates.push({ row: i + 2, values: [resolvedImages] });
     }
   }
-  SpreadsheetApp.flush();
+
+  for (var u = 0; u < pendingUpdates.length; u++) {
+    sheet.getRange(pendingUpdates[u].row, imageColumnStart, 1, 3).setValues(pendingUpdates[u].values);
+  }
+  if (pendingUpdates.length) SpreadsheetApp.flush();
 }
 
 /* ===== Data access ===== */
@@ -1367,7 +1482,15 @@ function getSpeciesData_() {
   for (var i = 0; i < rows.length; i++) {
     if (rows[i].species_id && rows[i].common_name) {
       var base = defaultMap[rows[i].species_id] || {};
-      var fallbackImages = getFallbackImageSetForSpecies_(rows[i].species_id, rows[i].common_name);
+      var resolvedImages = resolveSpeciesImageSet_(
+        rows[i].species_id,
+        rows[i].common_name || base.common_name || '',
+        [
+          rows[i].image_option_1_url || base.image_option_1_url || '',
+          rows[i].image_option_2_url || base.image_option_2_url || '',
+          rows[i].image_option_3_url || base.image_option_3_url || ''
+        ]
+      );
       out.push({
         species_id: rows[i].species_id,
         common_name: rows[i].common_name || base.common_name || '',
@@ -1379,9 +1502,9 @@ function getSpeciesData_() {
         habitat_hint: rows[i].habitat_hint || base.habitat_hint || '',
         diet_hint: rows[i].diet_hint || base.diet_hint || '',
         ecosystem_role_hint: rows[i].ecosystem_role_hint || base.ecosystem_role_hint || '',
-        image_option_1_url: rows[i].image_option_1_url || base.image_option_1_url || fallbackImages[0],
-        image_option_2_url: rows[i].image_option_2_url || base.image_option_2_url || fallbackImages[1],
-        image_option_3_url: rows[i].image_option_3_url || base.image_option_3_url || fallbackImages[2],
+        image_option_1_url: resolvedImages[0],
+        image_option_2_url: resolvedImages[1],
+        image_option_3_url: resolvedImages[2],
         research_link_1: rows[i].research_link_1 || base.research_link_1 || '',
         research_link_2: rows[i].research_link_2 || base.research_link_2 || ''
       });
@@ -1390,11 +1513,15 @@ function getSpeciesData_() {
 
   if (!out.length) {
     for (var j = 0; j < defaults.length; j++) {
-      var fi = getFallbackImageSetForSpecies_(defaults[j].species_id, defaults[j].common_name);
+      var fi = resolveSpeciesImageSet_(defaults[j].species_id, defaults[j].common_name, [
+        defaults[j].image_option_1_url,
+        defaults[j].image_option_2_url,
+        defaults[j].image_option_3_url
+      ]);
       out.push(mergeObjects_(defaults[j], {
-        image_option_1_url: defaults[j].image_option_1_url || fi[0],
-        image_option_2_url: defaults[j].image_option_2_url || fi[1],
-        image_option_3_url: defaults[j].image_option_3_url || fi[2]
+        image_option_1_url: fi[0],
+        image_option_2_url: fi[1],
+        image_option_3_url: fi[2]
       }));
     }
   }

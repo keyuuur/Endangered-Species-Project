@@ -5,235 +5,598 @@
     <?!= include('Styles'); ?>
   </head>
   <body>
-    <div class="app-shell">
-      <div class="hero">
-        <div class="hero-row">
-          <div>
-            <h1 id="appTitle"><?= appTitle ?></h1>
-            <p>Choose a species, complete your mission, and generate your final rescue poster.</p>
+    <div class="mission-shell">
+      <aside class="mission-sidebar">
+        <div class="sidebar-brand">
+          <div class="brand-shield">
+            <div class="brand-shield-inner">ES</div>
           </div>
+          <div class="brand-copy">
+            <div class="brand-title" id="appTitle">Mission Control</div>
+            <div class="brand-subtitle">Conservation HQ</div>
+          </div>
+        </div>
+
+        <section class="sidebar-section">
+          <div class="sidebar-heading">Mission Stages</div>
+          <div class="stage-rail">
+            <div class="sidebar-stage" id="sidebarStage-species">
+              <div class="stage-badge" id="sidebarStageNumber-species">1</div>
+              <div class="stage-copy">
+                <div class="stage-title">Species</div>
+                <div class="stage-subtitle">Choose your species</div>
+              </div>
+              <div class="stage-status" id="sidebarStageStatus-species"></div>
+            </div>
+
+            <div class="sidebar-stage" id="sidebarStage-briefing">
+              <div class="stage-badge" id="sidebarStageNumber-briefing">2</div>
+              <div class="stage-copy">
+                <div class="stage-title">Briefing</div>
+                <div class="stage-subtitle">Learn the basics</div>
+              </div>
+              <div class="stage-status" id="sidebarStageStatus-briefing"></div>
+            </div>
+
+            <div class="sidebar-stage" id="sidebarStage-ecology">
+              <div class="stage-badge" id="sidebarStageNumber-ecology">3</div>
+              <div class="stage-copy">
+                <div class="stage-title">Ecology</div>
+                <div class="stage-subtitle">Habitat and role</div>
+              </div>
+              <div class="stage-status" id="sidebarStageStatus-ecology"></div>
+            </div>
+
+            <div class="sidebar-stage" id="sidebarStage-threats">
+              <div class="stage-badge" id="sidebarStageNumber-threats">4</div>
+              <div class="stage-copy">
+                <div class="stage-title">Threats</div>
+                <div class="stage-subtitle">What is at risk</div>
+              </div>
+              <div class="stage-status" id="sidebarStageStatus-threats"></div>
+            </div>
+
+            <div class="sidebar-stage" id="sidebarStage-actions">
+              <div class="stage-badge" id="sidebarStageNumber-actions">5</div>
+              <div class="stage-copy">
+                <div class="stage-title">Actions</div>
+                <div class="stage-subtitle">Conservation solutions</div>
+              </div>
+              <div class="stage-status" id="sidebarStageStatus-actions"></div>
+            </div>
+
+            <div class="sidebar-stage" id="sidebarStage-final">
+              <div class="stage-badge" id="sidebarStageNumber-final">6</div>
+              <div class="stage-copy">
+                <div class="stage-title">Final Pitch</div>
+                <div class="stage-subtitle">Build your poster</div>
+              </div>
+              <div class="stage-status" id="sidebarStageStatus-final"></div>
+            </div>
+
+            <div class="sidebar-stage" id="sidebarStage-submitted">
+              <div class="stage-badge" id="sidebarStageNumber-submitted">7</div>
+              <div class="stage-copy">
+                <div class="stage-title">Submitted</div>
+                <div class="stage-subtitle">Mission complete</div>
+              </div>
+              <div class="stage-status" id="sidebarStageStatus-submitted"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="sidebar-section sidebar-checklist">
+          <div class="sidebar-heading">Mission Checklist</div>
+
+          <div class="checklist-item" id="checkSpecies">
+            <div class="checklist-mark"></div>
+            <div class="checklist-copy">
+              <div class="checklist-title">Species chosen</div>
+              <div class="checklist-subtitle">Choose your organism</div>
+            </div>
+          </div>
+
+          <div class="checklist-item" id="checkEcology">
+            <div class="checklist-mark"></div>
+            <div class="checklist-copy">
+              <div class="checklist-title">Ecology completed</div>
+              <div class="checklist-subtitle">Habitat and role filled in</div>
+            </div>
+          </div>
+
+          <div class="checklist-item" id="checkThreats">
+            <div class="checklist-mark"></div>
+            <div class="checklist-copy">
+              <div class="checklist-title">2 threats completed</div>
+              <div class="checklist-subtitle">Both risks explained</div>
+            </div>
+          </div>
+
+          <div class="checklist-item" id="checkActions">
+            <div class="checklist-mark"></div>
+            <div class="checklist-copy">
+              <div class="checklist-title">2 actions completed</div>
+              <div class="checklist-subtitle">Solutions are planned</div>
+            </div>
+          </div>
+
+          <div class="checklist-item" id="checkPitch">
+            <div class="checklist-mark"></div>
+            <div class="checklist-copy">
+              <div class="checklist-title">Final pitch written</div>
+              <div class="checklist-subtitle">Why it matters is ready</div>
+            </div>
+          </div>
+
+          <div class="checklist-item" id="checkImage">
+            <div class="checklist-mark"></div>
+            <div class="checklist-copy">
+              <div class="checklist-title">Poster image selected</div>
+              <div class="checklist-subtitle">Choose one final photo</div>
+            </div>
+          </div>
+
+          <div class="checklist-item" id="checkReady">
+            <div class="checklist-mark"></div>
+            <div class="checklist-copy">
+              <div class="checklist-title">Ready to submit</div>
+              <div class="checklist-subtitle">Mission can be finalized</div>
+            </div>
+          </div>
+        </section>
+
+        <div class="sidebar-footer">
+          <div class="save-pill">
+            <span class="save-dot"></span>
+            <span id="saveTimestamp">Last saved: Not yet</span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="mission-main">
+        <header class="mission-topbar">
+          <div class="top-progress-card">
+            <div class="top-progress-meta">
+              <div class="top-progress-title" id="progressText">Mission Progress</div>
+              <div class="top-progress-stage" id="progressStageText">Awaiting mission start</div>
+            </div>
+
+            <div class="progress-row">
+              <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+              </div>
+              <div class="progress-percent" id="progressPercent">0%</div>
+            </div>
+          </div>
+
           <button id="emergencySubmitBtn" class="btn btn-emergency hidden" type="button">Emergency Submit</button>
-        </div>
 
-        <div class="progress-wrap">
-          <div class="progress-label" id="progressText">Progress: 0%</div>
-          <div class="progress-bar">
-            <div class="progress-fill" id="progressFill"></div>
-          </div>
-        </div>
-      </div>
-
-      <div id="statusBox" class="status-banner hidden"></div>
-      <div id="busyMessage" class="panel hidden subtle">Loading...</div>
-
-      <section id="missionReference" class="panel hidden">
-        <div class="reference-row">
-          <div>
-            <div class="reference-title" id="referenceSpeciesName">Mission Reference</div>
-            <div class="subtle" id="referenceSpeciesMeta"></div>
-          </div>
-          <div id="referenceLinks" class="link-list"></div>
-        </div>
-      </section>
-
-      <section id="stage-login" class="panel">
-        <h2 class="section-title">Start Mission</h2>
-        <p class="subtle">Enter your information to begin.</p>
-
-        <div class="grid-2">
-          <div class="field">
-            <label for="firstName">First Name</label>
-            <input id="firstName" type="text" placeholder="Enter first name">
-          </div>
-
-          <div class="field">
-            <label for="lastName">Last Name</label>
-            <input id="lastName" type="text" placeholder="Enter last name">
-          </div>
-        </div>
-
-        <div class="btn-row">
-          <button id="startMissionBtn" class="btn btn-primary" type="button">Start Mission</button>
-        </div>
-      </section>
-
-      <section id="stage-species" class="panel hidden">
-        <h2 class="section-title">Choose Your Species</h2>
-        <p class="subtle">Pick one organism to research and protect.</p>
-        <div id="speciesGrid" class="species-grid"></div>
-      </section>
-
-      <section id="stage-briefing" class="panel hidden">
-        <h2 class="section-title">Mission Briefing</h2>
-
-        <div class="briefing-box">
-          <div class="pill" id="briefingCommonName"></div>
-          <div class="pill" id="briefingBiome">Biome</div>
-          <div class="pill" id="briefingRegion">Region</div>
-
-          <p id="briefingText" class="briefing-text"></p>
-          <div id="briefingLinks" class="link-list"></div>
-        </div>
-
-        <div class="btn-row">
-          <button class="btn btn-secondary" type="button" onclick="goBack('species')">← Back</button>
-          <button id="briefingContinueBtn" class="btn btn-primary" type="button">Continue</button>
-        </div>
-      </section>
-
-      <section id="stage-ecology" class="panel hidden">
-        <h2 class="section-title">Gather Ecological Evidence</h2>
-        <p class="subtle">Use your research to describe the species and how it survives.</p>
-
-        <div class="grid-2">
-          <div class="field">
-            <label for="commonNameAnswer">Common Name</label>
-            <input id="commonNameAnswer" type="text" placeholder="Type the common name of your organism">
-          </div>
-
-          <div class="field">
-            <label for="scientificNameAnswer">Scientific Name</label>
-            <input id="scientificNameAnswer" type="text" placeholder="Example: Panthera tigris">
-          </div>
-
-          <div class="field">
-            <label for="statusAnswer">Conservation Classification</label>
-            <select id="statusAnswer"></select>
-          </div>
-
-          <div class="field">
-            <label for="habitatType">Habitat Type</label>
-            <select id="habitatType"></select>
-          </div>
-
-          <div class="field">
-            <label for="dietType">Diet Type</label>
-            <select id="dietType"></select>
-          </div>
-
-          <div class="field">
-            <label for="adaptationType">Key Adaptation</label>
-            <input id="adaptationType" type="text" placeholder="Example: camouflage, strong shell, fast speed">
-          </div>
-
-          <div class="field">
-            <label for="ecosystemRole">Ecosystem Role</label>
-            <input id="ecosystemRole" type="text" placeholder="Example: predator, prey, pollinator, seed disperser">
-          </div>
-        </div>
-
-        <div class="field">
-          <label for="ecologyExplanation">Ecological Explanation — Explain what habitat it lives in, what it eats, and how it survives there.</label>
-          <textarea id="ecologyExplanation" placeholder="Explain what habitat it lives in, what it eats, and how it survives there."></textarea>
-        </div>
-
-        <div class="btn-row">
-          <button class="btn btn-secondary" type="button" onclick="goBack('briefing')">← Back</button>
-          <button id="saveEcologyBtn" class="btn btn-primary" type="button">Save and Continue</button>
-        </div>
-      </section>
-
-      <section id="stage-threats" class="panel hidden">
-        <h2 class="section-title">Identify 2 Threats</h2>
-        <p class="subtle">Choose two different threats and explain each one.</p>
-
-        <div class="threat-grid">
-          <div class="sub-panel">
-            <div class="field">
-              <label for="threat1">Threat 1</label>
-              <select id="threat1"></select>
+          <div class="top-identity-card">
+            <div class="student-badge" id="studentBadge">HQ</div>
+            <div class="student-copy">
+              <div class="student-label" id="studentClassLabel">Conservation Team</div>
+              <div class="student-subtle">Mission board</div>
             </div>
-            <div class="field">
-              <label for="threat1Reason">Why is this a threat?</label>
-              <textarea id="threat1Reason"></textarea>
+          </div>
+        </header>
+
+        <div id="statusBox" class="status-banner hidden"></div>
+        <div id="busyMessage" class="busy-banner hidden subtle">Loading mission data...</div>
+
+        <section id="missionReference" class="mission-command hidden">
+          <div class="command-media-wrap">
+            <img id="commandSpeciesImage" class="command-image hidden" alt="Selected species">
+            <div id="commandSpeciesFallback" class="command-image-fallback">Species image</div>
+          </div>
+
+          <div class="command-core">
+            <div class="command-kicker" id="commandStageLabel">Mission Control</div>
+            <div class="command-title-block">
+              <h1 id="referenceSpeciesName" class="command-title">Mission Reference</h1>
+              <div id="commandScientificName" class="command-scientific"></div>
+            </div>
+
+            <div class="command-meta-grid">
+              <div class="command-meta-card">
+                <div class="command-meta-label">Biome</div>
+                <div class="command-meta-value" id="commandMetaBiome">Awaiting species</div>
+              </div>
+
+              <div class="command-meta-card command-meta-alert">
+                <div class="command-meta-label">Conservation Status</div>
+                <div class="command-meta-value" id="commandMetaStatus">Not yet selected</div>
+              </div>
+
+              <div class="command-meta-card">
+                <div class="command-meta-label">Region</div>
+                <div class="command-meta-value" id="commandMetaRegion">Awaiting species</div>
+              </div>
+            </div>
+
+            <div class="command-summary">
+              <div class="command-summary-title">Species Summary</div>
+              <p id="commandSummary">Choose a species to load your mission summary.</p>
             </div>
           </div>
 
-          <div class="sub-panel">
-            <div class="field">
-              <label for="threat2">Threat 2</label>
-              <select id="threat2"></select>
+          <aside class="command-resources">
+            <div class="resources-title">Research &amp; Resources</div>
+            <div id="referenceLinks" class="resource-list"></div>
+          </aside>
+        </section>
+
+        <div class="stage-stack">
+          <section id="stage-login" class="stage-panel stage-login">
+            <div class="panel-header">
+              <div>
+                <div class="panel-kicker">Mission Intake</div>
+                <h2 class="section-title">Start Your Rescue Mission</h2>
+                <p class="section-copy">Enter your name to open your mission board and begin investigating an endangered species.</p>
+              </div>
             </div>
-            <div class="field">
-              <label for="threat2Reason">Why is this a threat?</label>
-              <textarea id="threat2Reason"></textarea>
+
+            <div class="login-grid">
+              <div class="stage-card stage-card-hero">
+                <div class="hero-card-kicker">Conservation HQ</div>
+                <h3 class="hero-card-title">Research a species. Build a rescue report. Generate a classroom-ready poster.</h3>
+                <p class="hero-card-copy">This mission walks you through species research, ecological evidence, threats, conservation actions, and a final advocacy pitch.</p>
+              </div>
+
+              <div class="stage-card">
+                <div class="card-title-row">
+                  <h3 class="card-title">Student Access</h3>
+                  <div class="card-tag">Secure local draft save</div>
+                </div>
+
+                <div class="grid-2">
+                  <div class="field">
+                    <label for="firstName">First Name</label>
+                    <input id="firstName" type="text" placeholder="Enter first name">
+                  </div>
+
+                  <div class="field">
+                    <label for="lastName">Last Name</label>
+                    <input id="lastName" type="text" placeholder="Enter last name">
+                  </div>
+                </div>
+
+                <div class="btn-row">
+                  <button id="startMissionBtn" class="btn btn-primary" type="button">Start Mission</button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          </section>
 
-        <div class="btn-row">
-          <button class="btn btn-secondary" type="button" onclick="goBack('ecology')">← Back</button>
-          <button id="saveThreatsBtn" class="btn btn-primary" type="button">Save and Continue</button>
-        </div>
-      </section>
-
-      <section id="stage-actions" class="panel hidden">
-        <h2 class="section-title">Choose 2 Conservation Actions</h2>
-        <p class="subtle">Choose two different actions and explain how they could help.</p>
-
-        <div class="grid-2">
-          <div class="field">
-            <label for="action1">Action 1</label>
-            <select id="action1"></select>
-          </div>
-
-          <div class="field">
-            <label for="action2">Action 2</label>
-            <select id="action2"></select>
-          </div>
-        </div>
-
-        <div class="field">
-          <label for="actionExplanation">How do these actions help?</label>
-          <textarea id="actionExplanation" placeholder="Ex. Breeding facilities would help by increasing the population and protecting young animals until they are strong enough to survive."></textarea>
-        </div>
-
-        <div class="btn-row">
-          <button class="btn btn-secondary" type="button" onclick="goBack('threats')">← Back</button>
-          <button id="saveActionsBtn" class="btn btn-primary" type="button">Save and Continue</button>
-        </div>
-      </section>
-
-      <section id="stage-final" class="panel hidden">
-        <h2 class="section-title">Final Pitch</h2>
-        <p class="subtle">Finish your mission and submit your rescue report.</p>
-
-        <div class="field">
-          <label>Choose a photo for your poster</label>
-          <div class="image-choice-grid" id="imageChoiceGrid">
-            <div class="image-choice" id="imageChoice0" onclick="selectPosterImage(0)">
-              <img id="posterImg0" alt="Species photo 1" referrerpolicy="no-referrer">
+          <section id="stage-species" class="stage-panel hidden">
+            <div class="panel-header">
+              <div>
+                <div class="panel-kicker">Phase 1</div>
+                <h2 class="section-title">Choose Your Species</h2>
+                <p class="section-copy">Pick one organism to research and protect. Your mission board will update once a species is selected.</p>
+              </div>
+              <div class="panel-chip" id="speciesReadyCount">Species catalog ready</div>
             </div>
-            <div class="image-choice" id="imageChoice1" onclick="selectPosterImage(1)">
-              <img id="posterImg1" alt="Species photo 2" referrerpolicy="no-referrer">
+
+            <div id="speciesGrid" class="species-grid"></div>
+          </section>
+
+          <section id="stage-briefing" class="stage-panel hidden">
+            <div class="panel-header">
+              <div>
+                <div class="panel-kicker">Phase 2</div>
+                <h2 class="section-title">Mission Briefing</h2>
+                <p class="section-copy">Read the mission summary, explore the resource links, and get ready to gather evidence.</p>
+              </div>
             </div>
-            <div class="image-choice" id="imageChoice2" onclick="selectPosterImage(2)">
-              <img id="posterImg2" alt="Species photo 3" referrerpolicy="no-referrer">
+
+            <div class="dashboard-grid dashboard-grid-briefing">
+              <div class="stage-card">
+                <div class="card-title-row">
+                  <h3 class="card-title">Mission Overview</h3>
+                  <div class="card-tag">Species briefing</div>
+                </div>
+
+                <div class="briefing-box">
+                  <div class="pill-row">
+                    <div class="pill" id="briefingCommonName"></div>
+                    <div class="pill" id="briefingBiome">Biome</div>
+                    <div class="pill" id="briefingRegion">Region</div>
+                  </div>
+
+                  <p id="briefingText" class="briefing-text"></p>
+                  <div id="briefingLinks" class="link-list"></div>
+                </div>
+              </div>
+
+              <div class="stage-card">
+                <div class="card-title-row">
+                  <h3 class="card-title">Next Steps</h3>
+                  <div class="card-tag">Field checklist</div>
+                </div>
+
+                <div class="guidance-list">
+                  <div class="guidance-item">Use the mission resources to confirm habitat, diet, and survival adaptations.</div>
+                  <div class="guidance-item">Take notes in your own words before moving to the ecology stage.</div>
+                  <div class="guidance-item">You can go back later if you need to review the reference materials.</div>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <div class="field">
-          <label for="whyItMatters">Why does this species matter?</label>
-          <textarea id="whyItMatters" placeholder="Why should people care about protecting this species?"></textarea>
-        </div>
+            <div class="btn-row">
+              <button class="btn btn-secondary" type="button" onclick="goBack('species')">&lt; Back</button>
+              <button id="briefingContinueBtn" class="btn btn-primary" type="button">Continue</button>
+            </div>
+          </section>
 
-        <div class="btn-row">
-          <button class="btn btn-secondary" type="button" onclick="goBack('actions')">← Back</button>
-          <button id="finishMissionBtn" class="btn btn-primary" type="button">Finish Mission</button>
-        </div>
-      </section>
+          <section id="stage-ecology" class="stage-panel hidden">
+            <div class="panel-header">
+              <div>
+                <div class="panel-kicker">Phase 3</div>
+                <h2 class="section-title">Gather Ecological Evidence</h2>
+                <p class="section-copy">Describe the species, where it lives, what it eats, and how it survives in its environment.</p>
+              </div>
+            </div>
 
-      <section id="stage-submitted" class="panel hidden">
-        <h2 class="section-title">Submission Complete</h2>
-        <p id="submittedMessage">Your rescue poster has been generated and saved.</p>
+            <div class="stage-card">
+              <div class="card-title-row">
+                <h3 class="card-title">Ecology Report</h3>
+                <div class="card-tag">Complete every field</div>
+              </div>
 
-        <div id="submittedLinks" class="btn-row hidden">
-          <a id="completeSlideLink" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">View Slide</a>
-          <a id="completePdfLink" class="btn btn-primary" target="_blank" rel="noopener noreferrer">Open Poster PDF</a>
-          <a id="completeTilePdfLink" class="btn btn-secondary hidden" target="_blank" rel="noopener noreferrer">Open Wall Tiles PDF</a>
+              <div class="grid-2">
+                <div class="field">
+                  <label for="commonNameAnswer">Common Name</label>
+                  <input id="commonNameAnswer" type="text" placeholder="Type the common name of your organism">
+                </div>
+
+                <div class="field">
+                  <label for="scientificNameAnswer">Scientific Name</label>
+                  <input id="scientificNameAnswer" type="text" placeholder="Example: Panthera tigris">
+                </div>
+
+                <div class="field">
+                  <label for="statusAnswer">Conservation Classification</label>
+                  <select id="statusAnswer"></select>
+                </div>
+
+                <div class="field">
+                  <label for="habitatType">Habitat Type</label>
+                  <select id="habitatType"></select>
+                </div>
+
+                <div class="field">
+                  <label for="dietType">Diet Type</label>
+                  <select id="dietType"></select>
+                </div>
+
+                <div class="field">
+                  <label for="adaptationType">Key Adaptation</label>
+                  <input id="adaptationType" type="text" placeholder="Example: camouflage, strong shell, fast speed">
+                </div>
+
+                <div class="field field-span-2">
+                  <label for="ecosystemRole">Ecosystem Role</label>
+                  <input id="ecosystemRole" type="text" placeholder="Example: predator, prey, pollinator, seed disperser">
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="ecologyExplanation">Ecological Explanation - Explain what habitat it lives in, what it eats, and how it survives there.</label>
+                <textarea id="ecologyExplanation" placeholder="Explain what habitat it lives in, what it eats, and how it survives there."></textarea>
+              </div>
+            </div>
+
+            <div class="btn-row">
+              <button class="btn btn-secondary" type="button" onclick="goBack('briefing')">&lt; Back</button>
+              <button id="saveEcologyBtn" class="btn btn-primary" type="button">Save and Continue</button>
+            </div>
+          </section>
+
+          <section id="stage-threats" class="stage-panel hidden">
+            <div class="panel-header">
+              <div>
+                <div class="panel-kicker">Phase 4</div>
+                <h2 class="section-title">Identify 2 Threats</h2>
+                <p class="section-copy">Choose two different threats and explain with a specific example of how each one affects this species in the real world.</p>
+              </div>
+            </div>
+
+            <div class="dashboard-grid dashboard-grid-dual">
+              <div class="stage-card alert-card">
+                <div class="card-title-row">
+                  <h3 class="card-title">Threat 1</h3>
+                  <div class="card-tag card-tag-alert">Required</div>
+                </div>
+
+                <div class="field">
+                  <label for="threat1">Threat 1</label>
+                  <select id="threat1"></select>
+                </div>
+                <div class="field">
+                  <label for="threat1Reason">Explain the specific example for this species</label>
+                  <textarea id="threat1Reason" placeholder="Example: New beachfront buildings can take away nesting areas, so turtles have fewer safe places to lay eggs."></textarea>
+                </div>
+              </div>
+
+              <div class="stage-card alert-card">
+                <div class="card-title-row">
+                  <h3 class="card-title">Threat 2</h3>
+                  <div class="card-tag card-tag-alert">Required</div>
+                </div>
+
+                <div class="field">
+                  <label for="threat2">Threat 2</label>
+                  <select id="threat2"></select>
+                </div>
+                <div class="field">
+                  <label for="threat2Reason">Explain the specific example for this species</label>
+                  <textarea id="threat2Reason" placeholder="Example: Fishing gear in coastal waters can trap sea turtles when they surface for air."></textarea>
+                </div>
+              </div>
+            </div>
+
+            <div class="btn-row">
+              <button class="btn btn-secondary" type="button" onclick="goBack('ecology')">&lt; Back</button>
+              <button id="saveThreatsBtn" class="btn btn-primary" type="button">Save and Continue</button>
+            </div>
+          </section>
+
+          <section id="stage-actions" class="stage-panel hidden">
+            <div class="panel-header">
+              <div>
+                <div class="panel-kicker">Phase 5</div>
+                <h2 class="section-title">Choose 2 Conservation Actions</h2>
+                <p class="section-copy">Plan two different solutions and explain how those actions could improve the species' chances of survival.</p>
+              </div>
+            </div>
+
+            <div class="stage-card success-card">
+              <div class="card-title-row">
+                <h3 class="card-title">Conservation Plan</h3>
+                <div class="card-tag card-tag-success">2 solutions</div>
+              </div>
+
+              <div class="grid-2">
+                <div class="field">
+                  <label for="action1">Action 1</label>
+                  <select id="action1"></select>
+                </div>
+
+                <div class="field">
+                  <label for="action2">Action 2</label>
+                  <select id="action2"></select>
+                </div>
+              </div>
+
+              <div class="field">
+                <label for="actionExplanation">How do these actions help?</label>
+                <textarea id="actionExplanation" placeholder="Ex. Breeding facilities would help by increasing the population and protecting young animals until they are strong enough to survive."></textarea>
+              </div>
+            </div>
+
+            <div class="btn-row">
+              <button class="btn btn-secondary" type="button" onclick="goBack('threats')">&lt; Back</button>
+              <button id="saveActionsBtn" class="btn btn-primary" type="button">Save and Continue</button>
+            </div>
+          </section>
+
+          <section id="stage-final" class="stage-panel hidden">
+            <div class="panel-header">
+              <div>
+                <div class="panel-kicker">Phase 6</div>
+                <h2 class="section-title">Final Pitch</h2>
+                <p class="section-copy">Review the mission evidence, choose your best poster image, and finish the final advocacy statement.</p>
+              </div>
+            </div>
+
+            <div class="dashboard-grid dashboard-grid-final">
+              <div class="stage-card summary-card summary-card-alert">
+                <div class="card-title-row">
+                  <h3 class="card-title">Threats</h3>
+                  <div class="card-tag card-tag-alert" id="finalThreatCount">2 identified</div>
+                </div>
+
+                <div class="summary-stack">
+                  <div class="summary-item">
+                    <div class="summary-item-title" id="finalThreat1Title">Threat 1</div>
+                    <div class="summary-item-text" id="finalThreat1Text">Choose and explain the first major threat.</div>
+                  </div>
+                  <div class="summary-item">
+                    <div class="summary-item-title" id="finalThreat2Title">Threat 2</div>
+                    <div class="summary-item-text" id="finalThreat2Text">Choose and explain the second major threat.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="stage-card summary-card summary-card-success">
+                <div class="card-title-row">
+                  <h3 class="card-title">Conservation Actions</h3>
+                  <div class="card-tag card-tag-success" id="finalActionCount">2 planned</div>
+                </div>
+
+                <div class="summary-stack">
+                  <div class="summary-item">
+                    <div class="summary-item-title" id="finalAction1Title">Action 1</div>
+                    <div class="summary-item-text" id="finalAction1Text">Choose the first conservation action.</div>
+                  </div>
+                  <div class="summary-item">
+                    <div class="summary-item-title" id="finalAction2Title">Action 2</div>
+                    <div class="summary-item-text" id="finalAction2Text">Choose the second conservation action.</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="stage-card summary-card">
+                <div class="card-title-row">
+                  <h3 class="card-title">Image Selection</h3>
+                  <div class="card-tag" id="imageSelectionCount">0 / 3</div>
+                </div>
+
+                <div class="field">
+                  <label>Choose a photo for your poster</label>
+                  <div class="image-choice-grid" id="imageChoiceGrid">
+                    <div class="image-choice" id="imageChoice0" onclick="selectPosterImage(0)">
+                      <img id="posterImg0" alt="Species photo 1" referrerpolicy="no-referrer">
+                    </div>
+                    <div class="image-choice" id="imageChoice1" onclick="selectPosterImage(1)">
+                      <img id="posterImg1" alt="Species photo 2" referrerpolicy="no-referrer">
+                    </div>
+                    <div class="image-choice" id="imageChoice2" onclick="selectPosterImage(2)">
+                      <img id="posterImg2" alt="Species photo 3" referrerpolicy="no-referrer">
+                    </div>
+                  </div>
+                </div>
+
+                <div class="tip-row">
+                  <div class="tip-copy">Tip: Choose the image that best helps your final poster tell the story of why this species matters.</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="stage-card submit-card">
+              <div class="card-title-row">
+                <h3 class="card-title">Final Output</h3>
+                <div class="card-tag">Nearly ready</div>
+              </div>
+
+              <div class="field">
+                <label for="whyItMatters">Why does this species matter?</label>
+                <textarea id="whyItMatters" placeholder="Why should people care about protecting this species?"></textarea>
+              </div>
+
+              <div class="output-preview">
+                <div class="output-preview-copy">
+                  Your mission poster will be generated after submission. Finish the final pitch to create the slide and poster PDF.
+                </div>
+              </div>
+
+              <div class="btn-row">
+                <button class="btn btn-secondary" type="button" onclick="goBack('actions')">&lt; Back</button>
+                <button id="finishMissionBtn" class="btn btn-primary" type="button">Finish Mission</button>
+              </div>
+            </div>
+          </section>
+
+          <section id="stage-submitted" class="stage-panel hidden">
+            <div class="panel-header">
+              <div>
+                <div class="panel-kicker">Mission Complete</div>
+                <h2 class="section-title">Submission Complete</h2>
+                <p class="section-copy">Your mission assets are ready. Open the generated files below.</p>
+              </div>
+            </div>
+
+            <div class="stage-card submitted-card">
+              <p id="submittedMessage">Your rescue poster has been generated and saved.</p>
+
+              <div id="submittedLinks" class="btn-row hidden">
+                <a id="completeSlideLink" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">View Slide</a>
+                <a id="completePdfLink" class="btn btn-primary" target="_blank" rel="noopener noreferrer">Open Poster PDF</a>
+              </div>
+            </div>
+          </section>
         </div>
-      </section>
+      </main>
     </div>
 
     <div id="submitModal" class="modal hidden">
