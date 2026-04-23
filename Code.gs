@@ -527,40 +527,42 @@ function posterA_drawHeader_(slide, submission, studentName) {
   pRect_(slide, 0, 4, 6, 64, '#2e7d5b', null, 0, false);
 
   pText_(slide, 'ENDANGERED SPECIES RESCUE REPORT', 22, 16, 520, 18,
-    { font: 'Georgia', size: 11, bold: true, color: '#c8e6c9' });
+    { font: 'Montserrat', size: 11, bold: true, color: '#c8e6c9' });
   pText_(slide, submission.common_name || 'Species Rescue', 22, 31, 500, 28,
-    { font: 'Georgia', size: 20, bold: true, color: '#ffffff' });
+    { font: 'Merriweather', size: 20, bold: true, color: '#ffffff' });
   pText_(slide, submission.scientific_name || '', 22, 55, 400, 16,
-    { font: 'Georgia', size: 10, italic: true, color: '#81c784' });
+    { font: 'Merriweather', size: 10, italic: true, color: '#81c784' });
 
   var attribution = 'Student: ' + studentName;
   if (trim_(submission.hour)) attribution += '    Period ' + trim_(submission.hour);
   pText_(slide, attribution, 490, 24, 220, 15,
-    { font: 'Arial', size: 9, color: '#a5d6a7', align: SlidesApp.ParagraphAlignment.END });
+    { font: 'Lato', size: 9, color: '#a5d6a7', align: SlidesApp.ParagraphAlignment.END });
 
   var status = trim_(submission.identified_status) || 'Endangered';
   pRect_(slide, 620, 48, 90, 18, '#c62828', null, 0, true);
   pText_(slide, status.toUpperCase(), 620, 48, 90, 18,
-    { font: 'Arial', size: 8, bold: true, color: '#ffcdd2', align: SlidesApp.ParagraphAlignment.CENTER });
+    { font: 'Montserrat', size: 8, bold: true, color: '#ffcdd2', align: SlidesApp.ParagraphAlignment.CENTER });
 }
 
 function posterA_drawPhotoCol_(slide, submission) {
   pRect_(slide, 8, 76, 188, 192, '#1a3a25', '#2e7d5b', 1, true);
   pRect_(slide, 14, 82, 176, 130, '#0d2b18', null, 0, true);
 
-  pText_(slide, 'QUICK FACTS', 14, 219, 176, 13,
-    { font: 'Arial', size: 8, bold: true, color: '#81c784' });
+  pText_(slide, 'QUICK FACTS', 14, 214, 176, 14,
+    { font: 'Montserrat', size: 9, bold: true, color: '#81c784' });
 
   var facts = [
     ['Habitat:', submission.habitat_type || '\u2014'],
     ['Diet:', submission.diet_type || '\u2014'],
     ['Adaptation:', submission.adaptation_type || '\u2014']
   ];
-  var fy = 237;
+  var rowHeights = [12, 12, 18];
+  var fy = 226;
   for (var fi = 0; fi < facts.length; fi++) {
-    pText_(slide, facts[fi][0], 14, fy, 44, 13, { font: 'Arial', size: 8, color: '#c8e6c9' });
-    pText_(slide, facts[fi][1], 60, fy, 130, 13, { font: 'Arial', size: 8, color: '#a5d6a7' });
-    fy += 13;
+    var rowHeight = rowHeights[fi];
+    pText_(slide, facts[fi][0], 14, fy, 48, rowHeight, { font: 'Montserrat', size: 8, color: '#c8e6c9' });
+    pText_(slide, facts[fi][1], 64, fy, 126, rowHeight, { font: 'Lato', size: 8, color: '#a5d6a7' });
+    fy += rowHeight;
   }
 }
 
@@ -569,18 +571,18 @@ function posterA_drawEcologyCol_(slide, submission) {
   pRect_(slide, 204, 76, 250, 22, '#1a3a5c', null, 0, true);
   pRect_(slide, 204, 90, 250, 8, '#1a3a5c', null, 0, false);
   pText_(slide, 'ECOLOGY', 214, 79, 230, 16,
-    { font: 'Arial', size: 9, bold: true, color: '#90caf9' });
+    { font: 'Montserrat', size: 10, bold: true, color: '#90caf9' });
 
   pRect_(slide, 212, 103, 234, 38, '#0d2137', '#1565c0', 1, true);
   pText_(slide, 'ECOSYSTEM ROLE', 219, 104, 220, 13,
-    { font: 'Arial', size: 8, bold: true, color: '#64b5f6' });
+    { font: 'Montserrat', size: 9, bold: true, color: '#64b5f6' });
   pText_(slide, submission.ecosystem_role || '', 219, 117, 220, 20,
-    { font: 'Arial', size: 8, color: '#bbdefb' });
+    { font: 'Lato', size: 8, color: '#bbdefb' });
 
   pText_(slide, 'ECOLOGICAL EXPLANATION', 212, 145, 234, 13,
-    { font: 'Arial', size: 8, bold: true, color: '#64b5f6' });
+    { font: 'Montserrat', size: 9, bold: true, color: '#64b5f6' });
   pText_(slide, submission.ecology_explanation || '', 212, 161, 234, 104,
-    { font: 'Arial', size: 8, color: '#bbdefb' });
+    { font: 'Lato', size: 8, color: '#bbdefb' });
 }
 
 function posterA_drawThreatsCol_(slide, submission) {
@@ -588,54 +590,51 @@ function posterA_drawThreatsCol_(slide, submission) {
   pRect_(slide, 462, 76, 250, 22, '#3e1a1a', null, 0, true);
   pRect_(slide, 462, 90, 250, 8, '#3e1a1a', null, 0, false);
   pText_(slide, 'THREATS', 472, 79, 230, 16,
-    { font: 'Arial', size: 9, bold: true, color: '#ef9a9a' });
+    { font: 'Montserrat', size: 10, bold: true, color: '#ef9a9a' });
 
   var t1 = trim_(submission.threat_1) || 'Threat 1';
   pRect_(slide, 470, 103, 234, 80, '#3e1111', '#c62828', 1, true);
   pText_(slide, 'THREAT 1 \u2014 ' + t1.toUpperCase(), 477, 104, 222, 14,
-    { font: 'Arial', size: 8, bold: true, color: '#ef5350' });
+    { font: 'Montserrat', size: 8, bold: true, color: '#ef5350' });
   pText_(slide, trim_(submission.threat_1_reason) || '', 477, 119, 222, 60,
-    { font: 'Arial', size: 8, color: '#ffcdd2' });
+    { font: 'Lato', size: 8, color: '#ffcdd2' });
 
   var t2 = trim_(submission.threat_2) || 'Threat 2';
   pRect_(slide, 470, 188, 234, 78, '#3e1111', '#c62828', 1, true);
   pText_(slide, 'THREAT 2 \u2014 ' + t2.toUpperCase(), 477, 189, 222, 14,
-    { font: 'Arial', size: 8, bold: true, color: '#ef5350' });
+    { font: 'Montserrat', size: 8, bold: true, color: '#ef5350' });
   pText_(slide, trim_(submission.threat_2_reason) || '', 477, 204, 222, 60,
-    { font: 'Arial', size: 8, color: '#ffcdd2' });
+    { font: 'Lato', size: 8, color: '#ffcdd2' });
 }
 
 function posterA_drawConservation_(slide, submission) {
-  pRect_(slide, 8, 276, 350, 114, '#1e1a2d', '#6a1b9a', 1, true);
-  pRect_(slide, 8, 276, 350, 22, '#2e1f4a', null, 0, true);
-  pRect_(slide, 8, 290, 350, 8, '#2e1f4a', null, 0, false);
-  pText_(slide, 'CONSERVATION ACTIONS', 18, 279, 320, 16,
-    { font: 'Arial', size: 9, bold: true, color: '#ce93d8' });
+  pRect_(slide, 8, 286, 350, 102, '#1e1a2d', '#6a1b9a', 1, true);
+  pRect_(slide, 8, 286, 350, 20, '#2e1f4a', null, 0, true);
+  pText_(slide, 'CONSERVATION ACTIONS', 18, 288, 320, 16,
+    { font: 'Montserrat', size: 10, bold: true, color: '#ce93d8' });
 
   var a1 = trim_(submission.action_1) || '';
   var a2 = trim_(submission.action_2) || '';
-  pRect_(slide, 18, 305, 155, 20, '#311b47', '#7b1fa2', 1, true);
-  pText_(slide, a1, 18, 305, 155, 20,
-    { font: 'Arial', size: 8, bold: true, color: '#e1bee7', align: SlidesApp.ParagraphAlignment.CENTER });
-  pRect_(slide, 181, 305, 165, 20, '#311b47', '#7b1fa2', 1, true);
-  pText_(slide, a2, 181, 305, 165, 20,
-    { font: 'Arial', size: 8, bold: true, color: '#e1bee7', align: SlidesApp.ParagraphAlignment.CENTER });
+  pRect_(slide, 18, 311, 155, 22, '#311b47', '#7b1fa2', 1, true);
+  pText_(slide, a1, 18, 311, 155, 22,
+    { font: 'Lato', size: 9, bold: true, color: '#e1bee7', align: SlidesApp.ParagraphAlignment.CENTER });
+  pRect_(slide, 181, 311, 165, 22, '#311b47', '#7b1fa2', 1, true);
+  pText_(slide, a2, 181, 311, 165, 22,
+    { font: 'Lato', size: 9, bold: true, color: '#e1bee7', align: SlidesApp.ParagraphAlignment.CENTER });
 
-  pText_(slide, 'HOW THESE ACTIONS HELP', 18, 328, 320, 13,
-    { font: 'Arial', size: 8, bold: true, color: '#ba68c8' });
-  pLine_(slide, 18, 342, 330, '#6a1b9a');
-  pText_(slide, trim_(submission.action_explanation) || '', 18, 344, 330, 42,
-    { font: 'Arial', size: 8, color: '#e1bee7' });
+  pText_(slide, 'HOW THESE ACTIONS HELP', 18, 338, 320, 14,
+    { font: 'Montserrat', size: 9, bold: true, color: '#ba68c8' });
+  pText_(slide, trim_(submission.action_explanation) || '', 18, 352, 330, 30,
+    { font: 'Lato', size: 9, color: '#e1bee7' });
 }
 
 function posterA_drawWhyMatters_(slide, submission) {
-  pRect_(slide, 366, 276, 346, 114, '#1a2a1a', '#2e7d5b', 1, true);
-  pRect_(slide, 366, 276, 346, 22, '#1e3d23', null, 0, true);
-  pRect_(slide, 366, 290, 346, 8, '#1e3d23', null, 0, false);
-  pText_(slide, 'WHY THIS SPECIES MATTERS', 376, 279, 326, 16,
-    { font: 'Arial', size: 9, bold: true, color: '#a5d6a7' });
-  pText_(slide, trim_(submission.why_it_matters) || '', 376, 302, 330, 84,
-    { font: 'Arial', size: 8, color: '#c8e6c9' });
+  pRect_(slide, 366, 286, 346, 102, '#1a2a1a', '#2e7d5b', 1, true);
+  pRect_(slide, 366, 286, 346, 20, '#1e3d23', null, 0, true);
+  pText_(slide, 'WHY THIS SPECIES MATTERS', 376, 288, 326, 16,
+    { font: 'Montserrat', size: 10, bold: true, color: '#a5d6a7' });
+  pText_(slide, trim_(submission.why_it_matters) || '', 376, 312, 330, 70,
+    { font: 'Lato', size: 9, color: '#c8e6c9' });
 }
 
 /* ===== Product B tile section drawers ===== */
