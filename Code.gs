@@ -25,10 +25,10 @@ var APP = {
     submitted: 'submitted'
   },
   posterImageBox: {
-    x: 14,
-    y: 82,
-    width: 176,
-    height: 130
+    x: 16,
+    y: 78,
+    width: 268,
+    height: 176
   },
   dropdowns: {
     habitatTypes: [
@@ -520,121 +520,206 @@ function pLine_(slide, x, y, w, colorHex) {
   return pRect_(slide, x, y, w, 1, colorHex, null, 0, false);
 }
 
+function pCircle_(slide, x, y, size, fillHex, borderHex, borderPt) {
+  var shape = slide.insertShape(SlidesApp.ShapeType.ELLIPSE, x, y, size, size);
+  var fc = hexToRgb_(fillHex || '#ffffff');
+  shape.getFill().setSolidFill(fc.r, fc.g, fc.b);
+  if (borderHex) {
+    var bc = hexToRgb_(borderHex);
+    shape.getBorder().getLineFill().setSolidFill(bc.r, bc.g, bc.b);
+    shape.getBorder().setWeight(borderPt || 1);
+  } else {
+    shape.getBorder().setTransparent();
+  }
+  return shape;
+}
+
+function clipText_(text, maxChars) {
+  var clean = trim_(text).replace(/\s+/g, ' ');
+  if (!clean) return '';
+  if (!maxChars || clean.length <= maxChars) return clean;
+  return clean.substring(0, Math.max(0, maxChars - 3)).trim() + '...';
+}
+
+function getPosterFactPack_(submission) {
+  var bySpecies = {
+    'hawksbill-turtle': { length: '70-95 cm (28-37 in)', weight: '45-70 kg (99-154 lbs)', location: 'Tropical and subtropical oceans', diet: 'Omnivore', habitat: 'Coral reefs' },
+    'whale-shark': { length: '9-12 m (30-40 ft)', weight: '15-20 t (33k-44k lbs)', location: 'Warm tropical oceans', diet: 'Filter feeder', habitat: 'Open ocean' },
+    'blue-whale': { length: '24-30 m (79-98 ft)', weight: '90-150 t (198k-330k lbs)', location: 'Oceans worldwide', diet: 'Filter feeder', habitat: 'Open ocean' },
+    'bornean-orangutan': { length: '1.2-1.5 m (4-5 ft)', weight: '30-100 kg (66-220 lbs)', location: 'Borneo rainforests', diet: 'Omnivore', habitat: 'Rainforest canopy' },
+    'red-panda': { length: '50-64 cm (20-25 in)', weight: '3-6 kg (7-13 lbs)', location: 'Eastern Himalayas', diet: 'Omnivore', habitat: 'Temperate forest' },
+    'african-forest-elephant': { length: '2.4-3 m (8-10 ft)', weight: '2-5 t (4k-11k lbs)', location: 'Central and West African forests', diet: 'Herbivore', habitat: 'Tropical forest' },
+    'african-wild-dog': { length: '75-110 cm (30-43 in)', weight: '18-36 kg (40-79 lbs)', location: 'Sub-Saharan savannas', diet: 'Carnivore', habitat: 'Grassland and savanna' },
+    'black-footed-ferret': { length: '38-61 cm (15-24 in)', weight: '0.6-1.4 kg (1-3 lbs)', location: 'North American prairies', diet: 'Carnivore', habitat: 'Prairie grassland' },
+    'addax': { length: '1-1.3 m (3-4 ft)', weight: '60-125 kg (132-275 lbs)', location: 'Sahara Desert', diet: 'Herbivore', habitat: 'Desert' }
+  };
+
+  var key = trim_(submission.species_id).toLowerCase();
+  var defaults = bySpecies[key] || {};
+
+  return {
+    habitat: trim_(submission.habitat_type) || defaults.habitat || trim_(submission.biome) || 'Varies by species',
+    diet: trim_(submission.diet_type) || defaults.diet || 'Varies by species',
+    length: defaults.length || 'See species guide',
+    weight: defaults.weight || 'See species guide',
+    location: defaults.location || trim_(submission.biome) || 'Multiple regions'
+  };
+}
+
 /* ===== Product A poster section drawers ===== */
 
 function posterA_drawHeader_(slide, submission, studentName) {
-  pRect_(slide, 0, 4, 720, 64, '#153324', null, 0, false);
-  pRect_(slide, 0, 4, 6, 64, '#2e7d5b', null, 0, false);
+  pRect_(slide, 4, 4, 712, 397, '#063b34', '#0f6656', 1, true);
+  pRect_(slide, 8, 8, 704, 60, '#0a2f2b', '#0f6656', 1, true);
 
-  pText_(slide, 'ENDANGERED SPECIES RESCUE REPORT', 22, 16, 520, 18,
+  pCircle_(slide, 14, 14, 48, '#0f5448', '#8cc8a8', 1);
+  pCircle_(slide, 20, 20, 36, '#08372f', '#63a784', 1);
+  pText_(slide, 'ES', 25, 32, 26, 12,
+    { font: 'Montserrat', size: 9, bold: true, color: '#dff3e5', align: SlidesApp.ParagraphAlignment.CENTER });
+
+  pText_(slide, 'ENDANGERED SPECIES RESCUE REPORT', 92, 16, 430, 16,
     { font: 'Montserrat', size: 11, bold: true, color: '#c8e6c9' });
-  pText_(slide, submission.common_name || 'Species Rescue', 22, 31, 500, 28,
-    { font: 'Merriweather', size: 20, bold: true, color: '#ffffff' });
-  pText_(slide, submission.scientific_name || '', 22, 55, 400, 16,
-    { font: 'Merriweather', size: 10, italic: true, color: '#81c784' });
+  pText_(slide, submission.common_name || 'Species Rescue', 92, 30, 430, 28,
+    { font: 'Merriweather', size: 22, bold: true, color: '#ffffff' });
+  pText_(slide, submission.scientific_name || '', 92, 56, 360, 12,
+    { font: 'Merriweather', size: 10, italic: true, color: '#9ecf6b' });
 
   var attribution = 'Student: ' + studentName;
   if (trim_(submission.hour)) attribution += '    Period ' + trim_(submission.hour);
-  pText_(slide, attribution, 490, 24, 220, 15,
+  pText_(slide, attribution, 476, 22, 228, 14,
     { font: 'Lato', size: 9, color: '#a5d6a7', align: SlidesApp.ParagraphAlignment.END });
 
   var status = trim_(submission.identified_status) || 'Endangered';
-  pRect_(slide, 620, 48, 90, 18, '#c62828', null, 0, true);
-  pText_(slide, status.toUpperCase(), 620, 48, 90, 18,
+  pRect_(slide, 606, 48, 98, 16, '#8a2f2f', null, 0, true);
+  pText_(slide, status.toUpperCase(), 606, 48, 98, 16,
     { font: 'Montserrat', size: 8, bold: true, color: '#ffcdd2', align: SlidesApp.ParagraphAlignment.CENTER });
 }
 
 function posterA_drawPhotoCol_(slide, submission) {
-  pRect_(slide, 8, 76, 188, 192, '#1a3a25', '#2e7d5b', 1, true);
-  pRect_(slide, 14, 82, 176, 130, '#0d2b18', null, 0, true);
+  pRect_(slide, 12, 74, 276, 210, '#0f3c32', '#9fc6ab', 1, true);
+  pRect_(slide, 16, 78, 268, 176, '#0b2f27', null, 0, true);
 
-  pText_(slide, 'QUICK FACTS', 14, 214, 176, 14,
+  var facts = getPosterFactPack_(submission);
+  pRect_(slide, 12, 292, 276, 92, '#f2efe2', '#b9c7b4', 1, true);
+  pRect_(slide, 12, 292, 276, 18, '#0b5144', null, 0, true);
+  pCircle_(slide, 20, 295, 12, '#2f7868', '#9ad1b0', 1);
+  pText_(slide, '*', 24, 298, 4, 8,
+    { font: 'Montserrat', size: 7, bold: true, color: '#dbf2e0', align: SlidesApp.ParagraphAlignment.CENTER });
+  pText_(slide, 'QUICK FACTS', 38, 295, 200, 12,
     { font: 'Montserrat', size: 9, bold: true, color: '#81c784' });
 
-  var facts = [
-    ['Habitat:', submission.habitat_type || '\u2014'],
-    ['Diet:', submission.diet_type || '\u2014'],
-    ['Adaptation:', submission.adaptation_type || '\u2014']
+  var rows = [
+    ['Habitat', facts.habitat],
+    ['Diet', facts.diet],
+    ['Length', facts.length],
+    ['Weight', facts.weight],
+    ['Location', facts.location]
   ];
-  var rowHeights = [12, 12, 18];
-  var fy = 226;
-  for (var fi = 0; fi < facts.length; fi++) {
-    var rowHeight = rowHeights[fi];
-    pText_(slide, facts[fi][0], 14, fy, 48, rowHeight, { font: 'Montserrat', size: 8, color: '#c8e6c9' });
-    pText_(slide, facts[fi][1], 64, fy, 126, rowHeight, { font: 'Lato', size: 8, color: '#a5d6a7' });
-    fy += rowHeight;
+  var ry = 312;
+  for (var i = 0; i < rows.length; i++) {
+    pCircle_(slide, 22, ry + 2, 8, '#f7f4ea', '#8db39e', 1);
+    pText_(slide, rows[i][0].substring(0, 1), 24, ry + 4, 4, 6,
+      { font: 'Montserrat', size: 5, bold: true, color: '#1f5f51', align: SlidesApp.ParagraphAlignment.CENTER });
+    pText_(slide, rows[i][0], 34, ry, 80, 12,
+      { font: 'Montserrat', size: 8, bold: true, color: '#174a3f' });
+    pText_(slide, clipText_(rows[i][1], 36), 114, ry, 168, 12,
+      { font: 'Lato', size: 8, color: '#1a4f43' });
+    if (i < rows.length - 1) pLine_(slide, 18, ry + 13, 260, '#d2d7cd');
+    ry += 14;
   }
 }
 
 function posterA_drawEcologyCol_(slide, submission) {
-  pRect_(slide, 204, 76, 250, 192, '#1a2c3a', '#1565c0', 1, true);
-  pRect_(slide, 204, 76, 250, 22, '#1a3a5c', null, 0, true);
-  pRect_(slide, 204, 90, 250, 8, '#1a3a5c', null, 0, false);
-  pText_(slide, 'ECOLOGY', 214, 79, 230, 16,
-    { font: 'Montserrat', size: 10, bold: true, color: '#90caf9' });
+  pRect_(slide, 296, 74, 200, 210, '#dbe8e6', '#8db7ba', 1, true);
+  pRect_(slide, 296, 74, 200, 26, '#d2e5e3', null, 0, true);
+  pCircle_(slide, 304, 79, 16, '#0f7f79', '#0f6a63', 1);
+  pText_(slide, 'E', 310, 84, 4, 8,
+    { font: 'Montserrat', size: 7, bold: true, color: '#e5fbf7', align: SlidesApp.ParagraphAlignment.CENTER });
+  pText_(slide, 'ECOLOGY', 326, 80, 160, 16,
+    { font: 'Montserrat', size: 11, bold: true, color: '#166f74' });
 
-  pRect_(slide, 212, 103, 234, 38, '#0d2137', '#1565c0', 1, true);
-  pText_(slide, 'ECOSYSTEM ROLE', 219, 104, 220, 13,
-    { font: 'Montserrat', size: 9, bold: true, color: '#64b5f6' });
-  pText_(slide, submission.ecosystem_role || '', 219, 117, 220, 20,
-    { font: 'Lato', size: 8, color: '#bbdefb' });
-
-  pText_(slide, 'ECOLOGICAL EXPLANATION', 212, 145, 234, 13,
-    { font: 'Montserrat', size: 9, bold: true, color: '#64b5f6' });
-  pText_(slide, submission.ecology_explanation || '', 212, 161, 234, 104,
-    { font: 'Lato', size: 8, color: '#bbdefb' });
+  pRect_(slide, 304, 106, 184, 170, '#edf4f3', '#95bcc0', 1, true);
+  pText_(slide, 'ECOSYSTEM ROLE', 314, 114, 164, 13,
+    { font: 'Montserrat', size: 9, bold: true, color: '#187f88' });
+  pText_(slide, clipText_(submission.ecosystem_role, 120), 314, 128, 164, 42,
+    { font: 'Lato', size: 9, color: '#1f545a' });
+  pLine_(slide, 314, 176, 164, '#7fb0b2');
+  pText_(slide, 'ECOLOGICAL EXPLANATION', 314, 183, 164, 13,
+    { font: 'Montserrat', size: 9, bold: true, color: '#187f88' });
+  pText_(slide, clipText_(submission.ecology_explanation, 260), 314, 197, 164, 74,
+    { font: 'Lato', size: 9, color: '#1f545a' });
 }
 
 function posterA_drawThreatsCol_(slide, submission) {
-  pRect_(slide, 462, 76, 250, 192, '#2d1515', '#c62828', 1, true);
-  pRect_(slide, 462, 76, 250, 22, '#3e1a1a', null, 0, true);
-  pRect_(slide, 462, 90, 250, 8, '#3e1a1a', null, 0, false);
-  pText_(slide, 'THREATS', 472, 79, 230, 16,
-    { font: 'Montserrat', size: 10, bold: true, color: '#ef9a9a' });
+  pRect_(slide, 502, 74, 206, 210, '#f1e4dd', '#e5a393', 1, true);
+  pRect_(slide, 502, 74, 206, 26, '#efdfd7', null, 0, true);
+  pCircle_(slide, 510, 79, 16, '#d7604f', '#cf5a48', 1);
+  pText_(slide, '!', 516, 84, 4, 8,
+    { font: 'Montserrat', size: 8, bold: true, color: '#fff1ef', align: SlidesApp.ParagraphAlignment.CENTER });
+  pText_(slide, 'THREATS', 532, 80, 166, 16,
+    { font: 'Montserrat', size: 11, bold: true, color: '#d05d4d' });
 
   var t1 = trim_(submission.threat_1) || 'Threat 1';
-  pRect_(slide, 470, 103, 234, 80, '#3e1111', '#c62828', 1, true);
-  pText_(slide, 'THREAT 1 \u2014 ' + t1.toUpperCase(), 477, 104, 222, 14,
-    { font: 'Montserrat', size: 8, bold: true, color: '#ef5350' });
-  pText_(slide, trim_(submission.threat_1_reason) || '', 477, 119, 222, 60,
-    { font: 'Lato', size: 8, color: '#ffcdd2' });
+  pRect_(slide, 510, 108, 190, 78, '#f7f1ec', '#eba798', 1, true);
+  pText_(slide, 'THREAT 1 - ' + t1.toUpperCase(), 518, 114, 174, 13,
+    { font: 'Montserrat', size: 8, bold: true, color: '#c53e31' });
+  pText_(slide, clipText_(submission.threat_1_reason, 190), 518, 128, 174, 53,
+    { font: 'Lato', size: 9, color: '#4a2b26' });
 
   var t2 = trim_(submission.threat_2) || 'Threat 2';
-  pRect_(slide, 470, 188, 234, 78, '#3e1111', '#c62828', 1, true);
-  pText_(slide, 'THREAT 2 \u2014 ' + t2.toUpperCase(), 477, 189, 222, 14,
-    { font: 'Montserrat', size: 8, bold: true, color: '#ef5350' });
-  pText_(slide, trim_(submission.threat_2_reason) || '', 477, 204, 222, 60,
-    { font: 'Lato', size: 8, color: '#ffcdd2' });
+  pRect_(slide, 510, 192, 190, 84, '#f7f1ec', '#eba798', 1, true);
+  pText_(slide, 'THREAT 2 - ' + t2.toUpperCase(), 518, 198, 174, 13,
+    { font: 'Montserrat', size: 8, bold: true, color: '#c53e31' });
+  pText_(slide, clipText_(submission.threat_2_reason, 195), 518, 212, 174, 58,
+    { font: 'Lato', size: 9, color: '#4a2b26' });
 }
 
 function posterA_drawConservation_(slide, submission) {
-  pRect_(slide, 8, 286, 350, 102, '#1e1a2d', '#6a1b9a', 1, true);
-  pRect_(slide, 8, 286, 350, 20, '#2e1f4a', null, 0, true);
-  pText_(slide, 'CONSERVATION ACTIONS', 18, 288, 320, 16,
-    { font: 'Montserrat', size: 10, bold: true, color: '#ce93d8' });
+  pRect_(slide, 296, 292, 200, 92, '#ece7f6', '#b3a6d2', 1, true);
+  pRect_(slide, 296, 292, 200, 20, '#e5def3', null, 0, true);
+  pCircle_(slide, 304, 295, 14, '#6b58a9', '#5e4b99', 1);
+  pText_(slide, 'C', 309, 299, 4, 8,
+    { font: 'Montserrat', size: 7, bold: true, color: '#f4efff', align: SlidesApp.ParagraphAlignment.CENTER });
+  pText_(slide, 'CONSERVATION ACTIONS', 324, 296, 164, 14,
+    { font: 'Montserrat', size: 9, bold: true, color: '#4f3b8f' });
+  pText_(slide, 'Actions we can take to protect this species:', 304, 314, 184, 12,
+    { font: 'Lato', size: 8, color: '#372b59' });
 
-  var a1 = trim_(submission.action_1) || '';
-  var a2 = trim_(submission.action_2) || '';
-  pRect_(slide, 18, 311, 155, 22, '#311b47', '#7b1fa2', 1, true);
-  pText_(slide, a1, 18, 311, 155, 22,
-    { font: 'Lato', size: 9, bold: true, color: '#e1bee7', align: SlidesApp.ParagraphAlignment.CENTER });
-  pRect_(slide, 181, 311, 165, 22, '#311b47', '#7b1fa2', 1, true);
-  pText_(slide, a2, 181, 311, 165, 22,
-    { font: 'Lato', size: 9, bold: true, color: '#e1bee7', align: SlidesApp.ParagraphAlignment.CENTER });
+  var a1 = clipText_(trim_(submission.action_1) || '', 28);
+  var a2 = clipText_(trim_(submission.action_2) || '', 30);
+  pRect_(slide, 304, 328, 88, 18, '#f2eeff', '#b6aad6', 1, true);
+  pText_(slide, a1, 306, 332, 84, 12,
+    { font: 'Lato', size: 7, bold: true, color: '#4f3b8f', align: SlidesApp.ParagraphAlignment.CENTER });
+  pRect_(slide, 398, 328, 90, 18, '#f2eeff', '#b6aad6', 1, true);
+  pText_(slide, a2, 400, 332, 86, 12,
+    { font: 'Lato', size: 7, bold: true, color: '#4f3b8f', align: SlidesApp.ParagraphAlignment.CENTER });
 
-  pText_(slide, 'HOW THESE ACTIONS HELP', 18, 338, 320, 14,
-    { font: 'Montserrat', size: 9, bold: true, color: '#ba68c8' });
-  pText_(slide, trim_(submission.action_explanation) || '', 18, 352, 330, 30,
-    { font: 'Lato', size: 9, color: '#e1bee7' });
+  pText_(slide, clipText_(trim_(submission.action_explanation) || '', 120), 304, 350, 184, 30,
+    { font: 'Lato', size: 8, color: '#3f3366' });
 }
 
 function posterA_drawWhyMatters_(slide, submission) {
-  pRect_(slide, 366, 286, 346, 102, '#1a2a1a', '#2e7d5b', 1, true);
-  pRect_(slide, 366, 286, 346, 20, '#1e3d23', null, 0, true);
-  pText_(slide, 'WHY THIS SPECIES MATTERS', 376, 288, 326, 16,
-    { font: 'Montserrat', size: 10, bold: true, color: '#a5d6a7' });
-  pText_(slide, trim_(submission.why_it_matters) || '', 376, 312, 330, 70,
-    { font: 'Lato', size: 9, color: '#c8e6c9' });
+  pRect_(slide, 502, 292, 206, 92, '#e6efe0', '#a8c19f', 1, true);
+  pRect_(slide, 502, 292, 206, 20, '#dce8d5', null, 0, true);
+  pCircle_(slide, 510, 295, 14, '#3a7a46', '#2f693b', 1);
+  pText_(slide, 'W', 515, 299, 4, 8,
+    { font: 'Montserrat', size: 7, bold: true, color: '#eff9ef', align: SlidesApp.ParagraphAlignment.CENTER });
+  pText_(slide, 'WHY THIS SPECIES MATTERS', 530, 296, 170, 14,
+    { font: 'Montserrat', size: 9, bold: true, color: '#2f6e38' });
+
+  pCircle_(slide, 510, 322, 34, '#f1f6ed', '#85ab80', 1);
+  pText_(slide, 'SP', 521, 337, 12, 8,
+    { font: 'Montserrat', size: 6, bold: true, color: '#376f3f', align: SlidesApp.ParagraphAlignment.CENTER });
+  pText_(slide, clipText_(trim_(submission.why_it_matters) || '', 165), 556, 322, 144, 58,
+    { font: 'Lato', size: 9, color: '#28412a' });
+}
+
+function posterA_drawFooter_(slide, submission) {
+  pRect_(slide, 12, 388, 696, 13, '#0a493f', '#1a7664', 1, true);
+  var speciesName = trim_(submission.common_name) || 'this species';
+  var line = 'A healthy ecosystem depends on every species. Protect ' + speciesName.toLowerCase() + ' today for a stronger tomorrow.';
+  pText_(slide, clipText_(line, 120), 24, 390, 672, 9,
+    { font: 'Merriweather', size: 9, italic: true, color: '#dbeedc', align: SlidesApp.ParagraphAlignment.CENTER });
 }
 
 /* ===== Product B tile section drawers ===== */
@@ -940,14 +1025,14 @@ function buildFallbackPoster_(outputFolder, posterName, submission) {
   var studentName = ([submission.first_name || '', submission.last_name || '']).join(' ').trim();
 
   var sections = [
-    ['topBar',       function() { pRect_(slide, 0, 0, 720, 4, '#2e7d5b', null, 0, false); }],
+    ['topBar',       function() { pRect_(slide, 0, 0, 720, 4, '#0f6656', null, 0, false); }],
     ['header',       function() { posterA_drawHeader_(slide, submission, studentName); }],
     ['photoCol',     function() { posterA_drawPhotoCol_(slide, submission); }],
     ['ecologyCol',   function() { posterA_drawEcologyCol_(slide, submission); }],
     ['threatsCol',   function() { posterA_drawThreatsCol_(slide, submission); }],
     ['conservation', function() { posterA_drawConservation_(slide, submission); }],
     ['whyMatters',   function() { posterA_drawWhyMatters_(slide, submission); }],
-    ['bottomBar',    function() { pRect_(slide, 0, 401, 720, 4, '#2e7d5b', null, 0, false); }]
+    ['footer',       function() { posterA_drawFooter_(slide, submission); }]
   ];
 
   for (var si = 0; si < sections.length; si++) {
