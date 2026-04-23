@@ -183,7 +183,9 @@ function setupProjectSheets() {
     ['project_title', APP.projectTitle],
     ['share_output_with_link', 'TRUE'],
     ['show_student_output_links', 'TRUE'],
-    ['use_template_poster', 'FALSE']
+    ['use_template_poster', 'FALSE'],
+    // Poster renderer: "fallback_v2" (default) or "template".
+    ['poster_render_mode', 'fallback_v2']
   ];
 
   ensureSheetHeaders_(ss, APP.sheetNames.species, speciesHeaders);
@@ -918,7 +920,7 @@ function generatePosterForSubmission_(submission) {
   var posterFile = null;
   var buildResult = null;
   var templateId = settings.poster_template_file_id;
-  var canUseTemplate = hasConfiguredDriveId_(templateId) && isTrueSetting_(settings.use_template_poster);
+  var canUseTemplate = shouldUseTemplatePoster_(settings, templateId);
 
   if (canUseTemplate) {
     try {
@@ -1096,6 +1098,12 @@ function hasConfiguredDriveId_(value) {
   if (!text) return false;
   if (text.indexOf('PASTE_') === 0) return false;
   return true;
+}
+
+function shouldUseTemplatePoster_(settings, templateId) {
+  var mode = trim_(settings.poster_render_mode).toLowerCase();
+  if (mode !== 'template') return false;
+  return hasConfiguredDriveId_(templateId) && isTrueSetting_(settings.use_template_poster);
 }
 
 function insertSlideImageFromUrl_(slide, imageUrl) {
