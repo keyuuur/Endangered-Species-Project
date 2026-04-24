@@ -890,15 +890,12 @@
 
     document.getElementById('submittedMessage').textContent = message;
 
-    var hasSlide = !!(result && result.slideUrl);
     var hasPdf = !!(result && result.pdfUrl);
     var canShowLinks = !!(result && result.studentCanViewFiles);
 
-    document.getElementById('submittedLinks').classList.toggle('hidden', !(canShowLinks && (hasSlide || hasPdf)));
-    document.getElementById('completeSlideLink').classList.toggle('hidden', !(canShowLinks && hasSlide));
+    document.getElementById('submittedLinks').classList.toggle('hidden', !(canShowLinks && hasPdf));
     document.getElementById('completePdfLink').classList.toggle('hidden', !(canShowLinks && hasPdf));
 
-    if (canShowLinks && hasSlide) document.getElementById('completeSlideLink').href = result.slideUrl;
     if (canShowLinks && hasPdf) document.getElementById('completePdfLink').href = result.pdfUrl;
 
     showStage('submitted');
