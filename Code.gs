@@ -161,8 +161,62 @@ function runThreeEndToEndTests() {
       action_explanation: 'Safer shipping lanes, slower ship speeds, and cleaner oceans can lower the risks blue whales face.',
       why_it_matters: 'Blue whales are the biggest animals on Earth, and protecting them helps keep ocean ecosystems healthier.',
       selected_image_url: ''
+    },
+    {
+      first_name: 'Test', last_name: 'OrangutanD_' + timestamp, hour: '4',
+      species_id: 'bornean-orangutan',
+      common_name: 'Bornean Orangutan', scientific_name: 'Pongo pygmaeus',
+      biome: 'Rainforest', identified_status: 'Critically Endangered',
+      habitat_type: 'Rainforest', diet_type: 'Herbivore',
+      adaptation_type: 'Long limbs', ecosystem_role: 'Seed disperser',
+      ecology_explanation: 'Bornean orangutans spread seeds when they eat fruit, so they help new rainforest plants grow.',
+      threat_1: 'Habitat loss',
+      threat_1_reason: 'Palm oil farms and logging can cut down the rainforest where orangutans live. When the forest is gone, they lose food, shelter, and safe places to move.',
+      threat_2: 'Poaching / overhunting',
+      threat_2_reason: 'Some orangutans are taken for the illegal pet trade, especially babies. This hurts the population because orangutans already reproduce very slowly.',
+      action_1: 'Protected areas / habitat restoration', action_2: 'Education / public awareness',
+      action_explanation: 'Protecting rainforest areas and teaching people about palm oil choices can help orangutans keep their habitat.',
+      why_it_matters: 'Saving orangutans also protects the rainforest and many other animals that live in the same trees.',
+      selected_image_url: ''
+    },
+    {
+      first_name: 'Test', last_name: 'WhaleSharkE_' + timestamp, hour: '5',
+      species_id: 'whale-shark',
+      common_name: 'Whale Shark', scientific_name: 'Rhincodon typus',
+      biome: 'Marine', identified_status: 'Endangered',
+      habitat_type: 'Open ocean', diet_type: 'Filter feeder',
+      adaptation_type: 'Migration', ecosystem_role: 'Consumer',
+      ecology_explanation: 'Whale sharks eat tiny plankton and small fish, which makes them part of the ocean food web even though they are huge.',
+      threat_1: 'Overfishing',
+      threat_1_reason: 'Whale sharks can get caught by fishing gear by accident. This is dangerous because they grow slowly and do not have many babies.',
+      threat_2: 'Pollution',
+      threat_2_reason: 'Plastic and dirty water can hurt the ocean areas where whale sharks feed. They may swallow trash while filter feeding.',
+      action_1: 'Research and monitoring', action_2: 'Pollution reduction',
+      action_explanation: 'Tracking whale sharks and reducing plastic pollution can help people protect the places where they feed and migrate.',
+      why_it_matters: 'Whale sharks show that the ocean is healthy, and protecting them also protects other ocean life.',
+      selected_image_url: ''
+    },
+    {
+      first_name: 'Test', last_name: 'ForestElephantF_' + timestamp, hour: '6',
+      species_id: 'african-forest-elephant',
+      common_name: 'African Forest Elephant', scientific_name: 'Loxodonta cyclotis',
+      biome: 'Rainforest', identified_status: 'Critically Endangered',
+      habitat_type: 'Rainforest', diet_type: 'Herbivore',
+      adaptation_type: 'Strong teeth / beak', ecosystem_role: 'Seed disperser',
+      ecology_explanation: 'African forest elephants eat fruit and spread seeds through the forest, so they help the rainforest keep growing.',
+      threat_1: 'Poaching / overhunting',
+      threat_1_reason: 'Some elephants are killed for ivory, which lowers the population and removes important adults from the herd.',
+      threat_2: 'Habitat loss',
+      threat_2_reason: 'Logging and roads can break the forest into smaller pieces. That makes it harder for elephants to find food and safe paths.',
+      action_1: 'Anti-poaching / stronger laws', action_2: 'Protected areas / habitat restoration',
+      action_explanation: 'Stronger anti-poaching patrols and protected forest corridors can help elephant herds survive.',
+      why_it_matters: 'Forest elephants help shape the rainforest, so protecting them helps protect the whole forest ecosystem.',
+      selected_image_url: ''
     }
   ];
+
+  shuffleArray_(cases);
+  cases = cases.slice(0, 3);
 
   var results = [];
   for (var i = 0; i < cases.length; i++) {
@@ -183,6 +237,16 @@ function runThreeEndToEndTests() {
     }
   }
   return results;
+}
+
+function shuffleArray_(items) {
+  for (var i = items.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var temp = items[i];
+    items[i] = items[j];
+    items[j] = temp;
+  }
+  return items;
 }
 
 function testPosterGeneration() {
@@ -216,7 +280,7 @@ function testPosterGeneration() {
 
 function doGet(e) {
   if (e && e.parameter && e.parameter.action === 'runE2ETests' &&
-      e.parameter.key === 'codex-e2e-2026') {
+      isE2ETestRequestAllowed_(e.parameter.key)) {
     var results = runThreeEndToEndTests();
     return ContentService
       .createTextOutput(JSON.stringify(results, null, 2))
@@ -233,6 +297,25 @@ function doGet(e) {
 
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+function isE2ETestRequestAllowed_(providedKey) {
+  var configuredKey = '';
+  try {
+    configuredKey = trim_(PropertiesService.getScriptProperties().getProperty('E2E_TEST_KEY'));
+  } catch (propError) {
+    Logger.log('E2E key property read failed: ' + propError);
+  }
+  if (!configuredKey) {
+    try {
+      configuredKey = trim_(getSettingsMap_().e2e_test_key);
+    } catch (settingsError) {
+      Logger.log('E2E key settings read failed: ' + settingsError);
+    }
+  }
+  // Keep the current classroom test branch reachable until a script property is set.
+  if (!configuredKey) configuredKey = 'codex-e2e-2026';
+  return !!configuredKey && trim_(providedKey) === configuredKey;
 }
 
 /* ===== Setup ===== */
@@ -269,6 +352,7 @@ function setupProjectSheets() {
     ['project_title', APP.projectTitle],
     ['share_output_with_link', 'TRUE'],
     ['show_student_output_links', 'TRUE'],
+    ['e2e_test_key', ''],
     ['use_template_poster', 'FALSE'],
     // Poster renderer: "fallback_v2" (default) or "template".
     ['poster_render_mode', 'fallback_v2']
@@ -838,7 +922,7 @@ function posterIconFallbackLabel_(type) {
     'info': 'i',
     'turtle-coral': ''
   };
-  return labels[type] || '•';
+  return Object.prototype.hasOwnProperty.call(labels, type) ? labels[type] : '';
 }
 
 function pDotDivider_(slide, x, y, width, colorHex, dotSize, gap) {
@@ -907,35 +991,28 @@ function posterStatusPalette_(status) {
   return { fill: '#2f6b39', border: '#8dbc8f', text: '#eef7ea' };
 }
 
-/* Override icon fallback labels so failed icon inserts degrade to empty circles
- * instead of noisy placeholder bullets/letters.
- */
-function posterIconFallbackLabel_(type) {
-  var labels = {
-    'turtle': '',
-    'leaf': '',
-    'heart': '',
-    'coral': '',
-    'waves': '',
-    'alert': '!',
-    'thermometer': '',
-    'shield': '',
-    'community': '',
-    'scales': '',
-    'pin': '',
-    'ruler': '',
-    'weight': '',
-    'info': 'i',
-    'turtle-coral': ''
-  };
-  return Object.prototype.hasOwnProperty.call(labels, type) ? labels[type] : '';
-}
-
 function clipText_(text, maxChars) {
   var clean = trim_(text).replace(/\s+/g, ' ');
   if (!clean) return '';
   if (!maxChars || clean.length <= maxChars) return clean;
   return clean.substring(0, Math.max(0, maxChars - 3)).trim() + '...';
+}
+
+function posterDisplayText_(text, maxChars) {
+  var clean = trim_(text).replace(/\s+/g, ' ');
+  if (!clean || !maxChars || clean.length <= maxChars) return clean;
+
+  var sentenceCut = -1;
+  var sentenceMarks = ['. ', '! ', '? '];
+  for (var i = 0; i < sentenceMarks.length; i++) {
+    var markIndex = clean.lastIndexOf(sentenceMarks[i], maxChars - 1);
+    if (markIndex > sentenceCut) sentenceCut = markIndex + 1;
+  }
+  if (sentenceCut >= Math.floor(maxChars * 0.58)) return clean.substring(0, sentenceCut).trim();
+
+  var wordCut = clean.lastIndexOf(' ', maxChars - 3);
+  if (wordCut < Math.floor(maxChars * 0.55)) wordCut = maxChars - 3;
+  return clean.substring(0, wordCut).trim() + '...';
 }
 
 function getPosterFactPack_(submission) {
@@ -995,184 +1072,6 @@ var POSTER_A = {
   mutedLine: '#c5cbbf'
 };
 
-function posterA_drawHeader_(slide, submission, studentName) {
-  pRect_(slide, 0, 0, 720, 405, POSTER_A.bg, POSTER_A.bg, 0, false);
-  pRect_(slide, 6, 4, 708, 397, '#08261d', '#124d41', 1, true);
-  pRect_(slide, 10, 8, 700, 389, POSTER_A.bg, '#0f5448', 1, true);
-  pRect_(slide, 12, 10, 696, 82, POSTER_A.headerBg, null, 0, true);
-  pRect_(slide, 12, 88, 696, 2, POSTER_A.bgBorder, null, 0, false);
-
-  pDecorIcon_(slide, 'waves-decor', 430, 28, 152, 46, '#2a6a5d');
-  pDecorIcon_(slide, 'turtle', 520, 24, 62, 62, '#1d574b');
-  pDecorIcon_(slide, 'coral-decor', 596, 18, 92, 64, '#275f52');
-
-  pCircle_(slide, 18, 14, 52, '#0f5f53', '#cfceb2', 1.2);
-  pCircle_(slide, 22, 18, 44, '#093a31', '#cfceb2', 1);
-  pText_(slide, 'ESR', 22, 31, 44, 12,
-    { font: 'Montserrat', size: 11, bold: true, color: '#f4ecd6', align: SlidesApp.ParagraphAlignment.CENTER });
-
-  pText_(slide, 'ENDANGERED SPECIES RESCUE REPORT', 86, 14, 430, 14,
-    { font: 'Montserrat', size: 10, bold: true, color: '#cfd9a8' });
-  pText_(slide, submission.common_name || 'Species Rescue', 86, 22, 430, 40,
-    { font: 'Merriweather', size: 30, bold: true, color: '#ffffff' });
-  pText_(slide, submission.scientific_name || '', 86, 62, 430, 18,
-    { font: 'Merriweather', size: 14, italic: true, color: POSTER_A.accent });
-
-  var attribution = 'Student: ' + studentName;
-  if (trim_(submission.hour)) attribution += '    Period ' + trim_(submission.hour);
-  pText_(slide, attribution, 498, 18, 196, 12,
-    { font: 'Lato', size: 7, color: '#cadb9d', align: SlidesApp.ParagraphAlignment.END });
-}
-
-function posterA_drawPhotoCol_(slide, submission) {
-  pRect_(slide, 16, 94, 248, 156, '#efe7d4', '#d7d7ba', 1, true);
-  pRect_(slide, 20, 98, 240, 148, '#0c2f28', '#7ba394', 0.8, true);
-
-  var facts = getPosterFactPack_(submission);
-  pRect_(slide, 16, 254, 248, 128, POSTER_A.cream, '#d6d4bb', 1, true);
-  pRect_(slide, 16, 254, 248, 20, '#0b5144', null, 0, true);
-  pCircle_(slide, 24, 257, 14, '#2f7868', '#9ad1b0', 1);
-  pText_(slide, 'QUICK FACTS', 44, 258, 126, 12,
-    { font: 'Montserrat', size: 9, bold: true, color: '#f2f8e6' });
-
-  var status = trim_(submission.identified_status);
-  if (status) {
-    var statusTone = posterStatusPalette_(status);
-    pRect_(slide, 176, 258, 78, 11, statusTone.fill, statusTone.border, 0.7, true);
-    pText_(slide, status.toUpperCase(), 180, 259, 70, 8,
-      { font: 'Montserrat', size: 5, bold: true, color: statusTone.text, align: SlidesApp.ParagraphAlignment.CENTER });
-  }
-
-  var rows = [
-    ['leaf', 'Habitat', facts.habitat],
-    ['waves', 'Diet', facts.diet],
-    ['ruler',  'Length', facts.length],
-    ['weight', 'Weight', facts.weight],
-    ['pin', 'Location', facts.location]
-  ];
-  var ry = 282;
-  for (var i = 0; i < rows.length; i++) {
-    pIcon_(slide, rows[i][0], 28, ry + 1, 12, '#19584b', 2.1);
-    pText_(slide, rows[i][1], 50, ry, 72, 14,
-      { font: 'Montserrat', size: 8, bold: true, color: '#174a3f' });
-    pText_(slide, clipText_(rows[i][2], 38), 126, ry, 124, 14,
-      { font: 'Lato', size: 8, color: POSTER_A.body });
-    if (i < rows.length - 1) pLine_(slide, 28, ry + 14, 216, '#d4d0bb');
-    ry += 22;
-  }
-}
-
-function posterA_drawEcologyCol_(slide, submission) {
-  pRect_(slide, 278, 96, 192, 170, POSTER_A.mint, '#9bc3c7', 1, true);
-  pIconBadge_(slide, 'leaf', 286, 100, 22, '#0f7f79', '#0f6a63', 1, '#eefbf9', 4);
-  pText_(slide, 'ECOLOGY', 318, 104, 140, 18,
-    { font: 'Montserrat', size: 12, bold: true, color: '#166f74' });
-
-  pRect_(slide, 288, 128, 172, 128, '#f6faf8', '#95bcc0', 1, true);
-  var roleText = trim_(submission.ecosystem_role_text) || trim_(submission.ecosystem_role) || '';
-  pIconBadge_(slide, 'coral', 298, 140, 24, '#f7ffff', '#6aaab0', 1, '#157077', 4);
-  pText_(slide, 'ECOSYSTEM ROLE', 332, 142, 116, 12,
-    { font: 'Montserrat', size: 8, bold: true, color: '#12656a' });
-  pText_(slide, clipText_(roleText, 148), 332, 154, 116, 30,
-    { font: 'Lato', size: 8, color: POSTER_A.body });
-
-  pText_(slide, '·····································', 300, 195, 150, 8,
-    { font: 'Arial', size: 6, color: '#79bac2', align: SlidesApp.ParagraphAlignment.CENTER });
-
-  pRect_(slide, 288, 202, 176, 56, '#f5f8f5', '#95bcc0', 1, true);
-  pIconBadge_(slide, 'waves', 294, 208, 18, '#ffffff', '#6aaab0', 1, '#157077', 3);
-  pText_(slide, 'ECOLOGICAL EXPLANATION', 318, 208, 136, 12,
-    { font: 'Montserrat', size: 8, bold: true, color: '#12656a' });
-  pText_(slide, clipText_(submission.ecology_explanation, 170), 318, 220, 136, 34,
-    { font: 'Lato', size: 8, color: POSTER_A.body });
-}
-
-function posterA_drawThreatsCol_(slide, submission) {
-  pRect_(slide, 476, 96, 226, 168, POSTER_A.blush, '#efb7a7', 1, true);
-  pIconBadge_(slide, 'alert', 482, 100, 22, '#ec856d', '#df765f', 1, '#fff5f2', 3);
-  pText_(slide, 'THREATS', 514, 104, 166, 18,
-    { font: 'Montserrat', size: 12, bold: true, color: '#c43d2f' });
-
-  var t1 = trim_(submission.threat_1) || 'Threat 1';
-  pRect_(slide, 486, 126, 208, 68, '#fff7f2', '#efab99', 1, true);
-  pIcon_(slide, 'coral', 496, 144, 24, '#ad2c23', 2.1);
-  pText_(slide, 'THREAT 1 \u2013 ' + t1.toUpperCase(), 530, 132, 154, 12,
-    { font: 'Montserrat', size: 8, bold: true, color: '#c53e31' });
-  pText_(slide, clipText_(submission.threat_1_reason, 170), 530, 146, 154, 40,
-    { font: 'Lato', size: 8, color: '#4a2b26' });
-
-  pText_(slide, '·····································', 520, 198, 150, 8,
-    { font: 'Arial', size: 6, color: '#f0aa97', align: SlidesApp.ParagraphAlignment.CENTER });
-
-  var t2 = trim_(submission.threat_2) || 'Threat 2';
-  pRect_(slide, 486, 206, 208, 50, '#fff7f2', '#efab99', 1, true);
-  pIcon_(slide, 'thermometer', 496, 220, 24, '#ad2c23', 2.1);
-  pText_(slide, 'THREAT 2 \u2013 ' + t2.toUpperCase(), 530, 212, 154, 12,
-    { font: 'Montserrat', size: 8, bold: true, color: '#c53e31' });
-  pText_(slide, clipText_(submission.threat_2_reason, 150), 530, 226, 154, 24,
-    { font: 'Lato', size: 8, color: '#4a2b26' });
-}
-
-function posterA_drawConservation_(slide, submission) {
-  pRect_(slide, 280, 270, 190, 108, POSTER_A.lavender, '#b9acd9', 1, true);
-  pIconBadge_(slide, 'shield', 286, 274, 20, '#6b58a9', '#5e4b99', 1, '#f4efff', 3);
-  pText_(slide, 'CONSERVATION ACTIONS', 314, 276, 150, 14,
-    { font: 'Montserrat', size: 9, bold: true, color: '#4f3b8f' });
-
-  var speciesLabel = (trim_(submission.common_name) || 'this species').toLowerCase();
-  pText_(slide, 'Actions we can take to help protect ' + speciesLabel + ':', 288, 298, 170, 12,
-    { font: 'Lato', size: 7, italic: true, color: '#4a3f78' });
-
-  var a1 = clipText_(trim_(submission.action_1) || '', 28);
-  var a2 = clipText_(trim_(submission.action_2) || '', 30);
-  var actions = [
-    { glyph: 'leaf', label: a1 || 'Protected areas' },
-    { glyph: 'turtle', label: a2 || 'Reduce pollution' },
-    { glyph: 'community', label: 'Support conservation education' },
-    { glyph: 'scales', label: 'Enforce laws against poaching' }
-  ];
-  var baseX = 292;
-  var cellW = 42;
-  for (var i = 0; i < actions.length; i++) {
-    var cx = baseX + i * cellW;
-    pCircle_(slide, cx, 318, 26, '#f6f2fd', '#a391cf', 1);
-    pIcon_(slide, actions[i].glyph, cx + 5, 323, 16, '#5e4b99', 1.9);
-    pText_(slide, clipText_(actions[i].label, 22), cx - 5, 346, 36, 26,
-      { font: 'Lato', size: 5, color: '#3f3366', align: SlidesApp.ParagraphAlignment.CENTER });
-  }
-}
-
-function posterA_drawWhyMatters_(slide, submission) {
-  pRect_(slide, 476, 270, 226, 108, POSTER_A.sage, '#adc4a2', 1, true);
-  pIconBadge_(slide, 'leaf', 482, 274, 20, '#3a7a46', '#2f693b', 1, '#eff9ef', 3);
-  pText_(slide, 'WHY THIS SPECIES MATTERS', 510, 276, 184, 14,
-    { font: 'Montserrat', size: 9, bold: true, color: '#2f6e38' });
-
-  pCircle_(slide, 492, 302, 48, '#f8fbf3', '#85ab80', 1);
-  pIcon_(slide, 'turtle-coral', 502, 312, 28, '#356c3e', 1.7);
-
-  pText_(slide, clipText_(trim_(submission.why_it_matters) || '', 220), 548, 304, 144, 66,
-    { font: 'Lato', size: 8, color: '#28412a' });
-}
-
-function posterA_drawFooter_(slide, submission) {
-  pRect_(slide, 12, 384, 696, 18, POSTER_A.headerBg, '#1a6556', 1, true);
-  pIconBadge_(slide, 'leaf', 22, 386, 14, '#0f5448', '#8cc8a8', 1, '#dbeedc', 3);
-  pDecorIcon_(slide, 'coral-decor', 640, 384, 56, 18, '#255e51');
-
-  var speciesName = (trim_(submission.common_name) || 'this species').toLowerCase();
-  var prefix = 'A healthy ecosystem depends on every species. ';
-  var highlight = 'Protect ' + speciesName + ' today ';
-  var tail = 'for a stronger, more resilient tomorrow.';
-  pText_(slide, prefix, 42, 389, 258, 12,
-    { font: 'Merriweather', size: 8, color: '#dbeedc' });
-  pText_(slide, highlight, 292, 389, 178, 12,
-    { font: 'Merriweather', size: 8, italic: true, bold: true, color: '#b1d26c' });
-  pText_(slide, tail, 460, 389, 220, 12,
-    { font: 'Merriweather', size: 8, color: '#dbeedc' });
-}
-
-/* Refined Poster A section drawers override the earlier versions above. */
 function posterA_drawHeader_(slide, submission, studentName) {
   pRect_(slide, 0, 0, 720, 405, POSTER_A.bg, POSTER_A.bg, 0, false);
   pRect_(slide, 6, 4, 708, 397, '#08261d', '#124d41', 1, true);
@@ -1260,7 +1159,7 @@ function posterA_drawEcologyCol_(slide, submission) {
   pRect_(slide, 300, 142, 5, 24, '#1a8d86', null, 0, true);
   pText_(slide, 'ECOSYSTEM ROLE', 314, 142, 134, 12,
     { font: 'Montserrat', size: 7, bold: true, color: '#12656a' });
-  pText_(slide, clipText_(roleText, 138), 314, 155, 134, 23,
+  pText_(slide, posterDisplayText_(roleText, 138), 314, 155, 134, 23,
     { font: 'Lato', size: 7, color: POSTER_A.body });
 
   pDotDivider_(slide, 314, 190, 118, '#79bac2', 2, 5);
@@ -1268,7 +1167,7 @@ function posterA_drawEcologyCol_(slide, submission) {
   pRect_(slide, 300, 202, 5, 24, '#1a8d86', null, 0, true);
   pText_(slide, 'ECOLOGICAL EXPLANATION', 314, 200, 136, 12,
     { font: 'Montserrat', size: 7, bold: true, color: '#12656a' });
-  pText_(slide, clipText_(submission.ecology_explanation, 138), 314, 217, 134, 29,
+  pText_(slide, posterDisplayText_(submission.ecology_explanation, 138), 314, 217, 134, 29,
     { font: 'Lato', size: 7, color: POSTER_A.body });
 }
 
@@ -1287,7 +1186,7 @@ function posterA_drawThreatsCol_(slide, submission) {
   pRect_(slide, 498, 142, 6, 24, '#e46e58', null, 0, true);
   pText_(slide, 'THREAT 1 - ' + posterThreatLabelShort_(t1), 514, 142, 166, 12,
     { font: 'Montserrat', size: 7, bold: true, color: '#c53e31' });
-  pText_(slide, clipText_(submission.threat_1_reason, 138), 514, 156, 166, 28,
+  pText_(slide, posterDisplayText_(submission.threat_1_reason, 138), 514, 156, 166, 28,
     { font: 'Lato', size: 7, color: '#4a2b26' });
 
   pDotDivider_(slide, 514, 194, 146, '#f0aa97', 2, 5);
@@ -1295,7 +1194,7 @@ function posterA_drawThreatsCol_(slide, submission) {
   pRect_(slide, 498, 206, 6, 24, '#e46e58', null, 0, true);
   pText_(slide, 'THREAT 2 - ' + posterThreatLabelShort_(t2), 514, 206, 166, 12,
     { font: 'Montserrat', size: 7, bold: true, color: '#c53e31' });
-  pText_(slide, clipText_(submission.threat_2_reason, 118), 514, 220, 166, 24,
+  pText_(slide, posterDisplayText_(submission.threat_2_reason, 118), 514, 220, 166, 24,
     { font: 'Lato', size: 7, color: '#4a2b26' });
 }
 
@@ -1344,7 +1243,7 @@ function posterA_drawWhyMatters_(slide, submission) {
 
   pRect_(slide, 486, 302, 206, 62, '#f8fbf3', '#9fc297', 1, true);
   pRect_(slide, 498, 314, 6, 34, '#5b8a55', null, 0, true);
-  pText_(slide, clipText_(trim_(submission.why_it_matters) || '', 160), 514, 314, 168, 34,
+  pText_(slide, posterDisplayText_(trim_(submission.why_it_matters) || '', 160), 514, 314, 168, 34,
     { font: 'Lato', size: 7, color: '#28412a' });
 }
 
@@ -1365,186 +1264,6 @@ function posterA_drawFooter_(slide, submission) {
     { font: 'Merriweather', size: 7, italic: true, bold: true, color: '#b1d26c' });
   pText_(slide, tail, 448, 386, 228, 14,
     { font: 'Merriweather', size: 7, color: '#dbeedc' });
-}
-
-/* ===== Product B tile section drawers ===== */
-
-function tileA_draw_(slide, submission, studentName) {
-  var bg = hexToRgb_('#0d1f14');
-  slide.getBackground().setSolidFill(bg.r, bg.g, bg.b);
-
-  pRect_(slide, 0, 0, 720, 5, '#2e7d5b', null, 0, false);
-  pRect_(slide, 0, 5, 720, 22, '#153324', null, 0, false);
-  pText_(slide, 'ENDANGERED SPECIES RESCUE', 0, 9, 720, 14,
-    { font: 'Arial', size: 8, bold: true, color: '#81c784', align: SlidesApp.ParagraphAlignment.CENTER });
-
-  pText_(slide, submission.common_name || '', 0, 26, 720, 32,
-    { font: 'Georgia', size: 22, bold: true, color: '#ffffff', align: SlidesApp.ParagraphAlignment.CENTER });
-  pText_(slide, submission.scientific_name || '', 0, 59, 720, 16,
-    { font: 'Georgia', size: 9, italic: true, color: '#81c784', align: SlidesApp.ParagraphAlignment.CENTER });
-
-  var status = trim_(submission.identified_status) || 'Endangered';
-  pRect_(slide, 300, 77, 120, 16, '#c62828', null, 0, true);
-  pText_(slide, status.toUpperCase(), 300, 77, 120, 16,
-    { font: 'Arial', size: 8, bold: true, color: '#ffcdd2', align: SlidesApp.ParagraphAlignment.CENTER });
-
-  pLine_(slide, 10, 99, 700, '#c62828');
-  pText_(slide, 'THREATS', 0, 102, 720, 14,
-    { font: 'Arial', size: 8, bold: true, color: '#ef9a9a', align: SlidesApp.ParagraphAlignment.CENTER });
-
-  var t1 = trim_(submission.threat_1) || 'Threat 1';
-  pRect_(slide, 10, 119, 700, 80, '#2d0e0e', '#c62828', 1, true);
-  pText_(slide, 'THREAT 1 \u2014 ' + t1.toUpperCase(), 18, 121, 684, 14,
-    { font: 'Arial', size: 8, bold: true, color: '#ef5350' });
-  pText_(slide, trim_(submission.threat_1_reason) || '', 18, 136, 684, 60,
-    { font: 'Arial', size: 8, color: '#ffcdd2' });
-
-  var t2 = trim_(submission.threat_2) || 'Threat 2';
-  pRect_(slide, 10, 204, 700, 80, '#2d0e0e', '#c62828', 1, true);
-  pText_(slide, 'THREAT 2 \u2014 ' + t2.toUpperCase(), 18, 206, 684, 14,
-    { font: 'Arial', size: 8, bold: true, color: '#ef5350' });
-  pText_(slide, trim_(submission.threat_2_reason) || '', 18, 221, 684, 60,
-    { font: 'Arial', size: 8, color: '#ffcdd2' });
-
-  pText_(slide, studentName, 0, 370, 720, 14,
-    { font: 'Arial', size: 8, color: '#a5d6a7', align: SlidesApp.ParagraphAlignment.CENTER });
-  pRect_(slide, 0, 390, 720, 5, '#2e7d5b', null, 0, false);
-}
-
-function tileB_draw_(slide, submission) {
-  var bg = hexToRgb_('#0d1826');
-  slide.getBackground().setSolidFill(bg.r, bg.g, bg.b);
-
-  pRect_(slide, 0, 0, 720, 5, '#1565c0', null, 0, false);
-  pRect_(slide, 0, 5, 720, 22, '#1a3a5c', null, 0, false);
-  pText_(slide, 'ECOLOGY', 0, 9, 720, 14,
-    { font: 'Arial', size: 9, bold: true, color: '#90caf9', align: SlidesApp.ParagraphAlignment.CENTER });
-  pLine_(slide, 10, 28, 700, '#1565c0');
-
-  var rows = [
-    ['Habitat', submission.habitat_type || '\u2014'],
-    ['Diet', submission.diet_type || '\u2014'],
-    ['Key Adaptation', submission.adaptation_type || '\u2014'],
-    ['Ecosystem Role', submission.ecosystem_role || '\u2014']
-  ];
-  var ry = 36;
-  for (var ri = 0; ri < rows.length; ri++) {
-    pText_(slide, rows[ri][0], 20, ry, 340, 13, { font: 'Arial', size: 8, bold: true, color: '#64b5f6' });
-    pText_(slide, rows[ri][1], 20, ry + 13, 680, 13, { font: 'Arial', size: 8, color: '#bbdefb' });
-    ry += 30;
-  }
-
-  pLine_(slide, 10, ry + 2, 700, '#1565c0');
-  pText_(slide, 'Ecological Explanation', 20, ry + 6, 680, 13,
-    { font: 'Arial', size: 8, bold: true, color: '#64b5f6' });
-  pText_(slide, trim_(submission.ecology_explanation) || '', 20, ry + 20, 680, 80,
-    { font: 'Arial', size: 8, italic: true, color: '#90caf9' });
-
-  pRect_(slide, 0, 390, 720, 5, '#1565c0', null, 0, false);
-}
-
-function tileC_draw_(slide, submission, imageUrl) {
-  var bg = hexToRgb_('#0a1a10');
-  slide.getBackground().setSolidFill(bg.r, bg.g, bg.b);
-
-  pRect_(slide, 0, 0, 720, 5, '#2e7d5b', null, 0, false);
-  pRect_(slide, 8, 10, 704, 280, '#071410', '#2e7d5b', 1, true);
-
-  if (imageUrl) {
-    try {
-      insertSlideImageIntoBox_(slide, imageUrl, 8, 10, 704, 280);
-    } catch (imgErr) {
-      Logger.log('tileC image insert failed: ' + imgErr);
-    }
-  }
-
-  pLine_(slide, 8, 294, 704, '#2e7d5b');
-  pText_(slide, submission.common_name || '', 0, 299, 720, 22,
-    { font: 'Georgia', size: 13, bold: true, color: '#ffffff', align: SlidesApp.ParagraphAlignment.CENTER });
-  pText_(slide, submission.scientific_name || '', 0, 322, 720, 14,
-    { font: 'Georgia', size: 9, italic: true, color: '#81c784', align: SlidesApp.ParagraphAlignment.CENTER });
-  var status = trim_(submission.identified_status) || 'Endangered';
-  pText_(slide, 'Conservation Status: ' + status.toUpperCase(), 0, 337, 720, 14,
-    { font: 'Arial', size: 8, color: '#a5d6a7', align: SlidesApp.ParagraphAlignment.CENTER });
-  pRect_(slide, 0, 390, 720, 5, '#2e7d5b', null, 0, false);
-}
-
-function tileD_draw_(slide, submission) {
-  var bg = hexToRgb_('#160d26');
-  slide.getBackground().setSolidFill(bg.r, bg.g, bg.b);
-
-  pRect_(slide, 0, 0, 720, 5, '#7b1fa2', null, 0, false);
-  pRect_(slide, 0, 5, 720, 22, '#2e1f4a', null, 0, false);
-  pText_(slide, 'CONSERVATION ACTIONS', 0, 9, 720, 14,
-    { font: 'Arial', size: 9, bold: true, color: '#ce93d8', align: SlidesApp.ParagraphAlignment.CENTER });
-  pLine_(slide, 10, 28, 700, '#7b1fa2');
-
-  pRect_(slide, 10, 34, 700, 22, '#2a0f40', '#7b1fa2', 1, true);
-  pText_(slide, trim_(submission.action_1) || '', 10, 34, 700, 22,
-    { font: 'Arial', size: 9, bold: true, color: '#e1bee7', align: SlidesApp.ParagraphAlignment.CENTER });
-  pRect_(slide, 10, 61, 700, 22, '#2a0f40', '#7b1fa2', 1, true);
-  pText_(slide, trim_(submission.action_2) || '', 10, 61, 700, 22,
-    { font: 'Arial', size: 9, bold: true, color: '#e1bee7', align: SlidesApp.ParagraphAlignment.CENTER });
-
-  pLine_(slide, 10, 90, 700, '#7b1fa2');
-  pText_(slide, 'How They Help', 20, 94, 680, 13,
-    { font: 'Arial', size: 8, bold: true, color: '#ba68c8' });
-  pText_(slide, trim_(submission.action_explanation) || '', 20, 108, 680, 80,
-    { font: 'Arial', size: 8, color: '#e1bee7' });
-
-  pRect_(slide, 0, 390, 720, 5, '#7b1fa2', null, 0, false);
-}
-
-function tileE_draw_(slide, submission, studentName) {
-  var bg = hexToRgb_('#0d1f14');
-  slide.getBackground().setSolidFill(bg.r, bg.g, bg.b);
-
-  pRect_(slide, 0, 0, 720, 5, '#2e7d5b', null, 0, false);
-  pRect_(slide, 0, 5, 720, 22, '#1e3d23', null, 0, false);
-  pText_(slide, 'WHY THIS SPECIES MATTERS', 0, 9, 720, 14,
-    { font: 'Arial', size: 9, bold: true, color: '#a5d6a7', align: SlidesApp.ParagraphAlignment.CENTER });
-  pLine_(slide, 10, 28, 700, '#2e7d5b');
-
-  pText_(slide, '\u201c', 20, 34, 40, 36, { font: 'Georgia', size: 30, color: '#2e7d5b' });
-  pText_(slide, trim_(submission.why_it_matters) || '', 30, 44, 660, 130,
-    { font: 'Georgia', size: 9, italic: true, color: '#c8e6c9' });
-  pText_(slide, '\u201d', 660, 160, 40, 36, { font: 'Georgia', size: 30, color: '#2e7d5b' });
-
-  pLine_(slide, 10, 300, 700, '#2e7d5b');
-  pText_(slide, 'student-authored', 0, 305, 720, 13,
-    { font: 'Arial', size: 8, italic: true, color: '#81c784', align: SlidesApp.ParagraphAlignment.CENTER });
-  pText_(slide, studentName, 0, 320, 720, 14,
-    { font: 'Arial', size: 9, color: '#a5d6a7', align: SlidesApp.ParagraphAlignment.CENTER });
-  pRect_(slide, 0, 390, 720, 5, '#2e7d5b', null, 0, false);
-}
-
-/* ===== Product B builder ===== */
-
-function buildTilePdf_(outputFolder, baseName, submission) {
-  var pres = SlidesApp.create(baseName + ' - Wall Tiles');
-  var file = DriveApp.getFileById(pres.getId());
-  var studentName = ([submission.first_name || '', submission.last_name || '']).join(' ').trim();
-  var imageUrl = pickBestPosterImageUrl_(submission);
-
-  var slides = pres.getSlides();
-  while (slides.length < 5) { pres.appendSlide(); slides = pres.getSlides(); }
-
-  var clearSlide = function(s) {
-    var els = s.getPageElements();
-    for (var i = els.length - 1; i >= 0; i--) { try { els[i].remove(); } catch (e) {} }
-  };
-  for (var si = 0; si < 5; si++) { clearSlide(slides[si]); }
-
-  try { tileA_draw_(slides[0], submission, studentName); } catch (e) { Logger.log('tileA failed: ' + e); }
-  try { tileB_draw_(slides[1], submission); } catch (e) { Logger.log('tileB failed: ' + e); }
-  try { tileC_draw_(slides[2], submission, imageUrl); } catch (e) { Logger.log('tileC failed: ' + e); }
-  try { tileD_draw_(slides[3], submission); } catch (e) { Logger.log('tileD failed: ' + e); }
-  try { tileE_draw_(slides[4], submission, studentName); } catch (e) { Logger.log('tileE failed: ' + e); }
-
-  pres.saveAndClose();
-  try { outputFolder.addFile(file); } catch (e) {}
-  try { DriveApp.getRootFolder().removeFile(file); } catch (e) {}
-  return { file: file, warning: '' };
 }
 
 /* ===== Poster generation ===== */
@@ -1593,20 +1312,29 @@ function generatePosterForSubmission_(submission) {
   }
 
   try {
-    posterFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     if (pdfFile) pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   } catch (shareError) {
     Logger.log('Sharing update failed: ' + shareError);
   }
 
+  if (pdfFile) archiveInternalPosterSlide_(posterFile);
+
   return {
-    slideUrl: posterFile.getUrl(),
+    slideUrl: '',
     pdfUrl: pdfFile ? pdfFile.getUrl() : '',
     posterFileId: posterFile.getId(),
     pdfFileId: pdfFile ? pdfFile.getId() : '',
     warning: warnings.join(' '),
     studentCanViewFiles: !!pdfFile
   };
+}
+
+function archiveInternalPosterSlide_(posterFile) {
+  try {
+    posterFile.setTrashed(true);
+  } catch (trashError) {
+    Logger.log('Could not trash internal poster slide after PDF export: ' + trashError);
+  }
 }
 
 function buildPosterFromTemplate_(templateId, outputFolder, posterName, submission) {
