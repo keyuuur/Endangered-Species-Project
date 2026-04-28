@@ -104,20 +104,23 @@ The current programmatic renderer is good enough to ship, but it is not yet as p
 
 ## Poster Renderer Notes
 
-The active fallback poster renderer is programmatic. It builds a Google Slide using native shapes/text and exports that Slide as a PDF.
+The active production poster renderer is now template-first. The app creates or reuses a Google Slides template named `_Template - Endangered Species Rescue Report`, copies it for each student submission, replaces named text placeholders, inserts the selected species image into the named `POSTER_IMAGE` frame, and exports the completed copy as a PDF.
 
 Known renderer constraints:
 
 - Apps Script Slides support is more limited than browser HTML/CSS.
 - Runtime SVG icon insertion has failed in prior tests, causing missing icons or failed sections.
 - Safer font normalization was added because some web fonts disappeared during PDF export.
-- Text is currently constrained by display helpers and fixed text boxes; this is better than raw character cuts, but still less robust than a real template.
+- Text is constrained by display helpers and fixed template boxes; this is better than raw character cuts, but still needs human review after new template changes.
 
-Recommended future visual improvement:
+The older programmatic renderer remains as the fallback path only. It should not be treated as the preferred production design path.
 
-- Build a real Google Slides template matching the target mockup.
-- Configure `poster_render_mode=template` and `poster_template_file_id` when ready.
-- Use the programmatic renderer as fallback only.
+Template settings:
+
+- `poster_render_mode=template`
+- `use_template_poster=TRUE`
+- `poster_template_version=template_first_v1`
+- `poster_template_file_id` is auto-filled when the template is first created
 
 ## Data Model
 
@@ -153,6 +156,7 @@ The project evolved roughly like this:
 8. Iterated heavily on the final PDF renderer after issues with missing text, fragile SVG icons, cramped conservation cards, and image stretching.
 9. Switched the student-facing final product to PDF-only because PDF quality is better than the intermediate Slide.
 10. Created the `5.5-attempt` branch to clean the shipped implementation and move the PDF closer to the ideal mockup.
+11. Converted the final PDF path to a template-first renderer so visual polish lives in a reusable Slides template instead of being redrawn from scratch for every submission.
 
 ## Current 5.5 Branch Goals
 
@@ -163,6 +167,7 @@ This branch is intended to:
 - reduce legacy wall-tile and duplicate renderer residue
 - keep E2E testing available but less hard-coded
 - improve poster text fitting and renderer maintainability
+- use a reusable Slides template as the primary PDF renderer
 - push the branch to Apps Script for visual review with three generated PDFs
 
 ## Things Future LLMs Should Avoid

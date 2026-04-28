@@ -353,9 +353,10 @@ function setupProjectSheets() {
     ['share_output_with_link', 'TRUE'],
     ['show_student_output_links', 'TRUE'],
     ['e2e_test_key', ''],
-    ['use_template_poster', 'FALSE'],
-    // Poster renderer: "fallback_v2" (default) or "template".
-    ['poster_render_mode', 'fallback_v2']
+    ['poster_template_version', 'template_first_v1'],
+    ['use_template_poster', 'TRUE'],
+    // Poster renderer: "template" is the production path; "fallback_v2" is the safety net.
+    ['poster_render_mode', 'template']
   ];
 
   ensureSheetHeaders_(ss, APP.sheetNames.species, speciesHeaders);
@@ -980,6 +981,320 @@ function posterActionLabelShort_(text, fallback) {
   return clipText_(trim_(text), 18);
 }
 
+function buildPosterTemplateReplacements_(submission) {
+  var facts = getPosterFactPack_(submission);
+  var speciesName = trim_(submission.common_name) || 'this species';
+  var studentName = [submission.first_name, submission.last_name].join(' ').trim();
+  var status = trim_(submission.identified_status) || trim_(submission.status) || '';
+  var threat1 = trim_(submission.threat_1) || 'Threat 1';
+  var threat2 = trim_(submission.threat_2) || 'Threat 2';
+  var action1 = posterActionLabelShort_(trim_(submission.action_1), 'Protect Habitat');
+  var action2 = posterActionLabelShort_(trim_(submission.action_2), 'Reduce Pollution');
+
+  return {
+    '{{STUDENT_NAME}}': studentName || 'Student',
+    '{{PERIOD}}': trim_(submission.hour) ? 'Period ' + trim_(submission.hour) : '',
+    '{{COMMON_NAME}}': speciesName,
+    '{{SCIENTIFIC_NAME}}': trim_(submission.scientific_name) || '',
+    '{{STATUS_BADGE}}': status.toUpperCase(),
+    '{{HABITAT}}': facts.habitat,
+    '{{DIET}}': facts.diet,
+    '{{LENGTH}}': facts.length,
+    '{{WEIGHT}}': facts.weight,
+    '{{LOCATION}}': facts.location,
+    '{{ECOSYSTEM_ROLE}}': posterDisplayText_(trim_(submission.ecosystem_role_text) || trim_(submission.ecosystem_role), 132),
+    '{{ECOLOGY_EXPLANATION}}': posterDisplayText_(submission.ecology_explanation, 150),
+    '{{THREAT_1_LABEL}}': 'THREAT 1 - ' + posterThreatLabelShort_(threat1),
+    '{{THREAT_1_REASON}}': posterDisplayText_(submission.threat_1_reason, 158),
+    '{{THREAT_2_LABEL}}': 'THREAT 2 - ' + posterThreatLabelShort_(threat2),
+    '{{THREAT_2_REASON}}': posterDisplayText_(submission.threat_2_reason, 144),
+    '{{ACTION_1}}': posterActionCaption_(action1, 15, 34),
+    '{{ACTION_2}}': posterActionCaption_(action2, 15, 34),
+    '{{ACTION_3}}': 'Community\nSupport',
+    '{{ACTION_4}}': 'Stronger\nLaws',
+    '{{WHY_IT_MATTERS}}': posterDisplayText_(submission.why_it_matters, 170),
+    '{{SPECIES_CTA}}': 'Protect ' + speciesName.toLowerCase() + ' today',
+    '{{HABITAT_ECOLOGY}}': posterDisplayText_(submission.ecology_explanation, 180),
+    '{{MAJOR_THREATS}}': posterDisplayText_(threat1 + ': ' + submission.threat_1_reason + ' ' + threat2 + ': ' + submission.threat_2_reason, 220),
+    '{{CONSERVATION_ACTIONS}}': action1 + '\n' + action2,
+    '{{WHY_THIS_SPECIES_MATTERS}}': posterDisplayText_(submission.why_it_matters, 170)
+  };
+}
+
+function setPageElementTitleSafe_(pageElement, title) {
+  try { pageElement.setTitle(title); } catch (titleErr) {
+    Logger.log('Could not set element title "' + title + '": ' + titleErr);
+  }
+  return pageElement;
+}
+
+function insertPlaceholderText_(slide, title, text, x, y, w, h, opts) {
+  return setPageElementTitleSafe_(pText_(slide, text, x, y, w, h, opts || {}), title);
+}
+
+function markPlaceholder_(shape, title) {
+  return setPageElementTitleSafe_(shape, title);
+}
+
+function clearSlide_(slide) {
+  var els = slide.getPageElements();
+  for (var i = els.length - 1; i >= 0; i--) {
+    try { els[i].remove(); } catch (removeErr) {}
+  }
+}
+
+function createPolishedPosterTemplate_(outputFolder) {
+  var templateName = '_Template - Endangered Species Rescue Report';
+  var pres = SlidesApp.create(templateName);
+  var file = DriveApp.getFileById(pres.getId());
+  var slide = pres.getSlides()[0];
+  clearSlide_(slide);
+
+  var bg = hexToRgb_(POSTER_A.bg);
+  slide.getBackground().setSolidFill(bg.r, bg.g, bg.b);
+  drawPolishedPosterTemplate_(slide);
+  pres.saveAndClose();
+
+  // Keep the template out of the student output folder when possible so clearing
+  // the destination folder only removes student PDFs.
+  try { DriveApp.getRootFolder().addFile(file); } catch (rootErr) {}
+  try {
+    if (outputFolder) outputFolder.removeFile(file);
+  } catch (removeFromOutputErr) {}
+  return file;
+}
+
+function drawPolishedPosterTemplate_(slide) {
+  pRect_(slide, 0, 0, 720, 405, POSTER_A.bg, POSTER_A.bg, 0, false);
+  pRect_(slide, 5, 4, 710, 397, '#08261d', '#144f42', 1.4, true);
+  pRect_(slide, 10, 9, 700, 386, '#05261d', '#1e6b59', 1.1, true);
+  pRect_(slide, 12, 11, 696, 78, '#06291f', null, 0, true);
+
+  pDecorIcon_(slide, 'waves-decor', 352, 27, 150, 43, '#275d51');
+  pDecorIcon_(slide, 'turtle-coral', 490, 20, 82, 58, '#1e5a4d');
+  pDecorIcon_(slide, 'coral-decor', 596, 14, 92, 64, '#2f6d5c');
+
+  pCircle_(slide, 20, 16, 56, '#102f26', '#d7d2ad', 1.5);
+  pCircle_(slide, 25, 21, 46, '#efe9ce', '#97bc8f', 0.9);
+  pCircle_(slide, 31, 27, 34, '#0b5a4e', '#0b5a4e', 0.5);
+  pDecorIcon_(slide, 'turtle-coral', 35, 31, 26, 26, '#f5efd4');
+
+  pText_(slide, 'ENDANGERED SPECIES RESCUE REPORT', 90, 17, 360, 13,
+    { font: 'Montserrat', size: 9, bold: true, color: '#d6d9a9' });
+  insertPlaceholderText_(slide, 'COMMON_NAME', '{{COMMON_NAME}}', 90, 30, 390, 34,
+    { font: 'Merriweather', size: 30, bold: true, color: '#fffdf5' });
+  insertPlaceholderText_(slide, 'SCIENTIFIC_NAME', '{{SCIENTIFIC_NAME}}', 90, 65, 330, 17,
+    { font: 'Merriweather', size: 13, italic: true, bold: true, color: '#a7ce71' });
+  pText_(slide, 'Student:', 562, 22, 38, 10,
+    { font: 'Montserrat', size: 7, bold: true, color: '#a8d566', align: SlidesApp.ParagraphAlignment.END });
+  insertPlaceholderText_(slide, 'STUDENT_NAME', '{{STUDENT_NAME}}', 602, 22, 88, 10,
+    { font: 'Arial', size: 7, color: '#fffaf0' });
+  insertPlaceholderText_(slide, 'PERIOD', '{{PERIOD}}', 602, 34, 88, 9,
+    { font: 'Arial', size: 6, color: '#d4dfc3' });
+
+  drawTemplatePhotoAndFacts_(slide);
+  drawTemplateEcology_(slide);
+  drawTemplateThreats_(slide);
+  drawTemplateConservation_(slide);
+  drawTemplateWhyMatters_(slide);
+  drawTemplateFooter_(slide);
+}
+
+function drawTemplatePhotoAndFacts_(slide) {
+  pRect_(slide, 16, 94, 272, 155, '#e8dfc7', '#e8dfc7', 1, true);
+  pRect_(slide, 20, 98, 264, 147, '#0b2d27', '#cdd5b6', 1, true);
+  markPlaceholder_(pRect_(slide, 23, 101, 258, 141, '#14372f', '#14372f', 0, true), 'POSTER_IMAGE');
+
+  pRect_(slide, 16, 256, 272, 126, POSTER_A.cream, '#e2d7b9', 1.1, true);
+  pRect_(slide, 16, 256, 272, 22, '#0d5848', null, 0, true);
+  pCircle_(slide, 26, 260, 15, '#2d7c68', '#9ec69f', 0.8);
+  pIcon_(slide, 'leaf', 30, 263, 8, '#ecf7dc', 1.3);
+  pText_(slide, 'QUICK FACTS', 52, 261, 124, 12,
+    { font: 'Montserrat', size: 9, bold: true, color: '#f6f7dd' });
+  insertPlaceholderText_(slide, 'STATUS_BADGE', '{{STATUS_BADGE}}', 185, 262, 88, 9,
+    { font: 'Montserrat', size: 5, bold: true, color: '#c6372e', align: SlidesApp.ParagraphAlignment.CENTER });
+
+  var rows = [
+    ['leaf', 'Habitat', '{{HABITAT}}'],
+    ['waves', 'Diet', '{{DIET}}'],
+    ['ruler', 'Length', '{{LENGTH}}'],
+    ['weight', 'Weight', '{{WEIGHT}}'],
+    ['pin', 'Location', '{{LOCATION}}']
+  ];
+  var y = 292;
+  for (var i = 0; i < rows.length; i++) {
+    pIcon_(slide, rows[i][0], 30, y - 1, 11, '#0d5848', 1.6);
+    pText_(slide, rows[i][1], 52, y - 2, 74, 11,
+      { font: 'Montserrat', size: 7.5, bold: true, color: '#17483d' });
+    insertPlaceholderText_(slide, rows[i][1].toUpperCase(), rows[i][2], 132, y - 2, 136, 11,
+      { font: 'Arial', size: 7.5, color: '#173b34' });
+    if (i < rows.length - 1) pDotDivider_(slide, 32, y + 16, 224, '#d6ccb6', 1.3, 5);
+    y += 19;
+  }
+}
+
+function drawTemplateEcology_(slide) {
+  pRect_(slide, 296, 94, 176, 172, POSTER_A.mint, '#d3dedc', 1, true);
+  pCircle_(slide, 306, 104, 24, '#087a73', '#c9e6df', 0.9);
+  pIcon_(slide, 'leaf', 313, 111, 11, '#f3fff7', 1.6);
+  pText_(slide, 'ECOLOGY', 344, 108, 110, 15,
+    { font: 'Montserrat', size: 10, bold: true, color: '#14747a' });
+  pRect_(slide, 306, 132, 156, 122, '#fbfdfb', '#97c1c2', 0.8, true);
+  pIcon_(slide, 'coral', 318, 152, 28, '#187577', 1.6);
+  pText_(slide, 'ECOSYSTEM ROLE', 360, 149, 88, 10,
+    { font: 'Montserrat', size: 6.5, bold: true, color: '#127078' });
+  insertPlaceholderText_(slide, 'ECOSYSTEM_ROLE', '{{ECOSYSTEM_ROLE}}', 360, 162, 86, 29,
+    { font: 'Arial', size: 6.4, color: '#253c38' });
+  pDotDivider_(slide, 320, 203, 120, '#6ab9bc', 1.4, 5);
+  pIcon_(slide, 'waves', 318, 217, 28, '#187577', 1.6);
+  pText_(slide, 'ECOLOGICAL EXPLANATION', 360, 214, 94, 10,
+    { font: 'Montserrat', size: 6.2, bold: true, color: '#127078' });
+  insertPlaceholderText_(slide, 'ECOLOGY_EXPLANATION', '{{ECOLOGY_EXPLANATION}}', 360, 227, 88, 22,
+    { font: 'Arial', size: 6.2, color: '#253c38' });
+}
+
+function drawTemplateThreats_(slide) {
+  pRect_(slide, 480, 94, 222, 172, POSTER_A.blush, '#efd3c4', 1, true);
+  pCircle_(slide, 490, 104, 24, '#e66f5c', '#f4b6a5', 0.9);
+  pText_(slide, '!', 490, 108, 24, 12,
+    { font: 'Arial', size: 11, bold: true, color: '#fff8f2', align: SlidesApp.ParagraphAlignment.CENTER });
+  pText_(slide, 'THREATS', 524, 108, 118, 15,
+    { font: 'Montserrat', size: 10, bold: true, color: '#cf4638' });
+  pRect_(slide, 490, 132, 202, 122, '#fff8f0', '#ed9b8b', 0.8, true);
+  pIcon_(slide, 'coral', 504, 154, 28, '#a3221c', 1.5);
+  insertPlaceholderText_(slide, 'THREAT_1_LABEL', '{{THREAT_1_LABEL}}', 548, 148, 126, 10,
+    { font: 'Montserrat', size: 6.5, bold: true, color: '#c92722' });
+  insertPlaceholderText_(slide, 'THREAT_1_REASON', '{{THREAT_1_REASON}}', 548, 162, 126, 32,
+    { font: 'Arial', size: 6.4, color: '#31231f' });
+  pDotDivider_(slide, 504, 204, 160, '#e99b8d', 1.4, 5);
+  pIcon_(slide, 'thermometer', 504, 218, 28, '#a3221c', 1.5);
+  insertPlaceholderText_(slide, 'THREAT_2_LABEL', '{{THREAT_2_LABEL}}', 548, 214, 126, 10,
+    { font: 'Montserrat', size: 6.5, bold: true, color: '#c92722' });
+  insertPlaceholderText_(slide, 'THREAT_2_REASON', '{{THREAT_2_REASON}}', 548, 228, 126, 20,
+    { font: 'Arial', size: 6.2, color: '#31231f' });
+}
+
+function drawTemplateConservation_(slide) {
+  pRect_(slide, 296, 270, 176, 94, POSTER_A.lavender, '#c9bedf', 1, true);
+  pCircle_(slide, 306, 278, 18, '#60499f', '#b8aad8', 0.9);
+  pIcon_(slide, 'shield', 311, 283, 8, '#f6f2ff', 1.4);
+  pText_(slide, 'CONSERVATION ACTIONS', 334, 281, 128, 11,
+    { font: 'Montserrat', size: 7.5, bold: true, color: '#46328f' });
+  pText_(slide, 'Actions we can take to help protect this species:', 306, 299, 156, 9,
+    { font: 'Arial', size: 5.6, color: '#3b315f' });
+
+  var actions = [
+    ['ACTION_1', '{{ACTION_1}}', 'shield', 306],
+    ['ACTION_2', '{{ACTION_2}}', 'turtle', 347],
+    ['ACTION_3', '{{ACTION_3}}', 'community', 388],
+    ['ACTION_4', '{{ACTION_4}}', 'scales', 429]
+  ];
+  for (var i = 0; i < actions.length; i++) {
+    var x = actions[i][3];
+    pCircle_(slide, x, 314, 28, '#f6f1ff', '#b7a3d6', 0.8);
+    pIcon_(slide, actions[i][2], x + 7, 321, 14, '#48318a', 1.4);
+    insertPlaceholderText_(slide, actions[i][0], actions[i][1], x - 2, 344, 32, 14,
+      { font: 'Arial', size: 4.1, color: '#31215d', align: SlidesApp.ParagraphAlignment.CENTER });
+    if (i < actions.length - 1) pLine_(slide, x + 35, 318, 1, '#cdbfe2');
+  }
+}
+
+function drawTemplateWhyMatters_(slide) {
+  pRect_(slide, 480, 270, 222, 94, POSTER_A.sage, '#c5d6b9', 1, true);
+  pCircle_(slide, 490, 278, 18, '#2d7541', '#9cc797', 0.9);
+  pIcon_(slide, 'heart', 495, 284, 8, '#f4fff2', 1.4);
+  pText_(slide, 'WHY THIS SPECIES MATTERS', 518, 281, 160, 11,
+    { font: 'Montserrat', size: 7.5, bold: true, color: '#2e6d36' });
+  pRect_(slide, 490, 302, 202, 52, '#f9fcf4', '#9fc491', 0.8, true);
+  pCircle_(slide, 504, 313, 30, '#eef7df', '#78a66f', 0.8);
+  pDecorIcon_(slide, 'turtle-coral', 511, 320, 18, 18, '#2e6d36');
+  insertPlaceholderText_(slide, 'WHY_IT_MATTERS', '{{WHY_IT_MATTERS}}', 548, 314, 126, 30,
+    { font: 'Arial', size: 6.2, color: '#283c27' });
+}
+
+function drawTemplateFooter_(slide) {
+  pRect_(slide, 16, 370, 686, 22, '#06291f', '#1f6a58', 1, true);
+  pCircle_(slide, 28, 373, 16, '#0c5747', '#8fc79d', 0.9);
+  pIcon_(slide, 'leaf', 33, 378, 7, '#ecf7dc', 1.2);
+  pText_(slide, 'A healthy ecosystem depends on every species.', 56, 376, 218, 12,
+    { font: 'Merriweather', size: 7, color: '#fff5de' });
+  insertPlaceholderText_(slide, 'SPECIES_CTA', '{{SPECIES_CTA}}', 276, 376, 166, 12,
+    { font: 'Merriweather', size: 7, italic: true, bold: true, color: '#a7ce71' });
+  pText_(slide, 'for a stronger, more resilient tomorrow.', 438, 376, 186, 12,
+    { font: 'Merriweather', size: 7, color: '#fff5de' });
+  pDecorIcon_(slide, 'coral-decor', 638, 371, 54, 20, '#2d6f5b');
+}
+
+function findTemplatePlaceholder_(slide, title) {
+  var elements = slide.getPageElements();
+  for (var i = 0; i < elements.length; i++) {
+    try {
+      if (elements[i].getTitle && elements[i].getTitle() === title) return elements[i];
+    } catch (titleErr) {}
+  }
+  return null;
+}
+
+function drawImageFrame_(slide, x, y, w, h) {
+  pRect_(slide, x - 1.5, y - 1.5, w + 3, 2, '#f4ecd6', null, 0, false);
+  pRect_(slide, x - 1.5, y + h - 0.5, w + 3, 2, '#f4ecd6', null, 0, false);
+  pRect_(slide, x - 1.5, y - 1.5, 2, h + 3, '#f4ecd6', null, 0, false);
+  pRect_(slide, x + w - 0.5, y - 1.5, 2, h + 3, '#f4ecd6', null, 0, false);
+}
+
+function replaceTemplateImagePlaceholder_(slide, imageUrl) {
+  var placeholder = findTemplatePlaceholder_(slide, 'POSTER_IMAGE');
+  if (!placeholder || !imageUrl) return false;
+  var x = placeholder.getLeft();
+  var y = placeholder.getTop();
+  var w = placeholder.getWidth();
+  var h = placeholder.getHeight();
+  try { placeholder.remove(); } catch (removeErr) {}
+  var inserted = insertSlideImageIntoBox_(slide, imageUrl, x, y, w, h);
+  if (inserted) drawImageFrame_(slide, x, y, w, h);
+  return inserted;
+}
+
+function setSettingValue_(key, value) {
+  var ss = getSpreadsheet_();
+  var sheet = ss.getSheetByName(APP.sheetNames.settings);
+  if (!sheet) return;
+  var values = sheet.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
+    if (trim_(values[i][0]) === key) {
+      sheet.getRange(i + 1, 2).setValue(value);
+      SpreadsheetApp.flush();
+      return;
+    }
+  }
+  sheet.appendRow([key, value]);
+  SpreadsheetApp.flush();
+}
+
+function ensurePolishedPosterTemplate_(settings, outputFolder) {
+  var configuredId = trim_(settings.poster_template_file_id);
+  var expectedVersion = 'template_first_v1';
+  var currentVersion = trim_(settings.poster_template_version);
+  if (hasConfiguredDriveId_(configuredId) && currentVersion === expectedVersion) {
+    try {
+      DriveApp.getFileById(configuredId);
+      setSettingValue_('use_template_poster', 'TRUE');
+      setSettingValue_('poster_render_mode', 'template');
+      return configuredId;
+    } catch (existingErr) {
+      Logger.log('Configured poster template unavailable, creating a new one: ' + existingErr);
+    }
+  }
+
+  var newTemplate = createPolishedPosterTemplate_(outputFolder);
+  var templateId = newTemplate.getId();
+  setSettingValue_('poster_template_file_id', templateId);
+  setSettingValue_('poster_template_version', expectedVersion);
+  setSettingValue_('use_template_poster', 'TRUE');
+  setSettingValue_('poster_render_mode', 'template');
+  return templateId;
+}
+
 function posterStatusPalette_(status) {
   var value = String(status || '').toLowerCase();
   if (value.indexOf('critical') >= 0) {
@@ -1281,7 +1596,17 @@ function generatePosterForSubmission_(submission) {
 
   var posterFile = null;
   var buildResult = null;
-  var templateId = settings.poster_template_file_id;
+  var templateId = '';
+  try {
+    templateId = ensurePolishedPosterTemplate_(settings, outputFolder);
+    settings.poster_template_file_id = templateId;
+    settings.poster_render_mode = 'template';
+    settings.use_template_poster = 'TRUE';
+  } catch (templateSetupError) {
+    Logger.log('Poster template setup failed. Fallback renderer will be used. ' + templateSetupError);
+    warnings.push('Poster template setup failed, so a fallback poster was created.');
+    templateId = trim_(settings.poster_template_file_id);
+  }
   var canUseTemplate = shouldUseTemplatePoster_(settings, templateId);
 
   if (canUseTemplate) {
@@ -1344,37 +1669,22 @@ function buildPosterFromTemplate_(templateId, outputFolder, posterName, submissi
   var slides = presentation.getSlides();
 
   if (!slides || !slides.length) throw new Error('Poster template has no slides.');
-
-  var habitatEcologyText =
-    (submission.habitat_type || '') + '\n' +
-    (submission.diet_type || '') + '\n' +
-    (submission.adaptation_type || '') + '\n' +
-    (submission.ecosystem_role || '') + '\n\n' +
-    (submission.ecology_explanation || '');
-
-  var majorThreatsText =
-    '1. ' + (submission.threat_1 || '') + ': ' + (submission.threat_1_reason || '') + '\n\n' +
-    '2. ' + (submission.threat_2 || '') + ': ' + (submission.threat_2_reason || '');
-
-  var actionLines = [];
-  if (submission.action_1) actionLines.push('1. ' + submission.action_1);
-  if (submission.action_2) actionLines.push((actionLines.length + 1) + '. ' + submission.action_2);
-  var conservationActionsText = actionLines.join('\n') + '\n\n' + (submission.action_explanation || '');
-
-  var replacements = {
-    '{{STUDENT_NAME}}': [submission.first_name, submission.last_name].join(' ').trim(),
-    '{{HOUR}}': submission.hour || '',
-    '{{COMMON_NAME}}': submission.common_name || '',
-    '{{SCIENTIFIC_NAME}}': submission.scientific_name || '',
-    '{{HABITAT_ECOLOGY}}': habitatEcologyText,
-    '{{MAJOR_THREATS}}': majorThreatsText,
-    '{{CONSERVATION_ACTIONS}}': conservationActionsText,
-    '{{WHY_IT_MATTERS}}': submission.why_it_matters || ''
-  };
+  var replacements = buildPosterTemplateReplacements_(submission);
 
   for (var placeholder in replacements) {
     if (replacements.hasOwnProperty(placeholder)) {
       presentation.replaceAllText(placeholder, replacements[placeholder]);
+    }
+  }
+
+  var imageUrl = pickBestPosterImageUrl_(submission);
+  if (imageUrl) {
+    try {
+      if (!replaceTemplateImagePlaceholder_(slides[0], imageUrl)) {
+        insertSlideImageFromUrl_(slides[0], imageUrl);
+      }
+    } catch (imageErr) {
+      Logger.log('Template image placement failed: ' + imageErr);
     }
   }
 
