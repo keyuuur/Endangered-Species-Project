@@ -2575,35 +2575,34 @@ function ensureSheetHeaders_(ss, sheetName, headers) {
 
   var existingHeaders = getHeaders_(sheet);
   var changed = false;
+  var hasDataRows = sheet.getLastRow() > 1;
 
-  if (existingHeaders.length > headers.length) {
-    if (sheet.getLastRow() > 1) {
-      throw new Error('Sheet "' + sheetName + '" has extra columns. Remove or rename them manually before continuing.');
-    }
+  if (!hasDataRows) {
     sheet.clearContents();
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     existingHeaders = headers.slice();
     changed = true;
-  }
+  } else {
+    var existingHeaderMap = {};
+    for (var h = 0; h < existingHeaders.length; h++) {
+      var existingHeader = trim_(existingHeaders[h]);
+      if (existingHeader && !existingHeaderMap[existingHeader]) existingHeaderMap[existingHeader] = h + 1;
+    }
 
-  for (var i = 0; i < headers.length; i++) {
-    if (existingHeaders[i] === headers[i]) continue;
-    if (i >= existingHeaders.length) {
-      sheet.getRange(1, i + 1).setValue(headers[i]);
-      existingHeaders.push(headers[i]);
+    for (var i = 0; i < headers.length; i++) {
+      if (existingHeaderMap[headers[i]]) continue;
+
+      // Existing class data is more important than perfect column order.
+      // Add any newly required headers to the right instead of renaming or deleting old columns.
+      var newColumn = sheet.getLastColumn() + 1;
+      sheet.getRange(1, newColumn).setValue(headers[i]);
+      existingHeaderMap[headers[i]] = newColumn;
       changed = true;
-      continue;
     }
-    if (sheet.getLastRow() > 1) {
-      throw new Error('Sheet "' + sheetName + '" already has data and a header does not match. Fix headers manually.');
-    }
-    sheet.getRange(1, i + 1).setValue(headers[i]);
-    existingHeaders[i] = headers[i];
-    changed = true;
   }
 
   sheet.setFrozenRows(1);
-  autoResizeColumns_(sheet, headers.length);
+  autoResizeColumns_(sheet, sheet.getLastColumn());
   if (changed) SpreadsheetApp.flush();
   return sheet;
 }
