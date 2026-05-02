@@ -108,6 +108,7 @@ var APP = {
 /* ===== Test function — run from GAS editor to verify poster generation ===== */
 
 function runThreeEndToEndTests() {
+  ensureProjectReady_();
   var timestamp = Utilities.formatDate(new Date(), 'America/Chicago', 'yyyyMMddHHmm');
   var cases = [
     {
@@ -279,9 +280,21 @@ function testPosterGeneration() {
 /* ===== Web app entry points ===== */
 
 function doGet(e) {
-  if (e && e.parameter && e.parameter.action === 'runE2ETests' &&
-      isE2ETestRequestAllowed_(e.parameter.key)) {
+  if (e && e.parameter && e.parameter.action === 'runE2ETests') {
+    if (!isE2ETestRequestAllowed_(e.parameter.key)) {
+      return ContentService
+        .createTextOutput(JSON.stringify({
+          ok: false,
+          error: 'Web E2E tests are disabled or the provided key is invalid.'
+        }, null, 2))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
     var results = runThreeEndToEndTests();
+    if (String(e.parameter.disableAfter || '').toLowerCase() === 'true') {
+      try { setSettingValue_('allow_e2e_endpoint', 'FALSE'); } catch (disableErr) {
+        Logger.log('Could not disable E2E endpoint after test run: ' + disableErr);
+      }
+    }
     return ContentService
       .createTextOutput(JSON.stringify(results, null, 2))
       .setMimeType(ContentService.MimeType.JSON);
@@ -300,6 +313,17 @@ function include(filename) {
 }
 
 function isE2ETestRequestAllowed_(providedKey) {
+  var settings = {};
+  try {
+    ensureProjectReady_();
+    settings = getSettingsMap_();
+  } catch (readyError) {
+    Logger.log('E2E setup/settings read failed: ' + readyError);
+    return false;
+  }
+
+  if (!isTrueSetting_(settings.allow_e2e_endpoint)) return false;
+
   var configuredKey = '';
   try {
     configuredKey = trim_(PropertiesService.getScriptProperties().getProperty('E2E_TEST_KEY'));
@@ -308,13 +332,11 @@ function isE2ETestRequestAllowed_(providedKey) {
   }
   if (!configuredKey) {
     try {
-      configuredKey = trim_(getSettingsMap_().e2e_test_key);
+      configuredKey = trim_(settings.e2e_test_key);
     } catch (settingsError) {
       Logger.log('E2E key settings read failed: ' + settingsError);
     }
   }
-  // Keep the current classroom test branch reachable until a script property is set.
-  if (!configuredKey) configuredKey = 'codex-e2e-2026';
   return !!configuredKey && trim_(providedKey) === configuredKey;
 }
 
@@ -339,6 +361,8 @@ function setupProjectSheets() {
     'action_1', 'action_2', 'action_3', 'action_explanation',
     'why_it_matters', 'selected_image_url',
     'score_out_of_100', 'submit_type', 'submission_message',
+    // Legacy output columns retained for old sheet compatibility.
+    // Do not reintroduce wall tiles or student-facing Slides unless explicitly requested.
     'poster_file_id', 'poster_slide_url', 'pdf_file_id', 'poster_pdf_url',
     'tile_pdf_file_id', 'tile_pdf_url',
     'submission_status'
@@ -353,6 +377,7 @@ function setupProjectSheets() {
     ['share_output_with_link', 'TRUE'],
     ['show_student_output_links', 'TRUE'],
     ['e2e_test_key', ''],
+    ['allow_e2e_endpoint', 'FALSE'],
     ['poster_template_version', 'template_first_v1'],
     ['use_template_poster', 'TRUE'],
     // Poster renderer: "template" is the production path; "fallback_v2" is the safety net.
@@ -381,16 +406,114 @@ function resetProjectSheetsDangerously() {
   return setupProjectSheets();
 }
 
+function ensureProjectReady_() {
+  setupProjectSheets();
+  seedDefaultSpeciesMasterIfNeeded_();
+  patchMissingSpeciesImageData_();
+}
+
+function runSetupHealthCheck() {
+  var result = { ok: true, checks: [], warnings: [] };
+
+  function addCheck(name, ok, detail) {
+    result.checks.push({ name: name, ok: !!ok, detail: detail || '' });
+    if (!ok) result.ok = false;
+  }
+
+  try {
+    ensureProjectReady_();
+    addCheck('Safe setup', true, 'Required sheets and defaults were checked non-destructively.');
+  } catch (setupError) {
+    addCheck('Safe setup', false, String(setupError));
+  }
+
+  var ss = null;
+  try {
+    ss = getSpreadsheet_();
+    addCheck('Spreadsheet', true, ss.getName() + ' (' + ss.getId() + ')');
+  } catch (spreadsheetError) {
+    addCheck('Spreadsheet', false, String(spreadsheetError));
+  }
+
+  if (ss) {
+    var requiredSheets = [APP.sheetNames.species, APP.sheetNames.submissions, APP.sheetNames.settings];
+    for (var i = 0; i < requiredSheets.length; i++) {
+      var sheet = ss.getSheetByName(requiredSheets[i]);
+      addCheck('Sheet: ' + requiredSheets[i], !!sheet, sheet ? 'Found with ' + Math.max(0, sheet.getLastRow() - 1) + ' data rows.' : 'Missing.');
+    }
+
+    try {
+      var speciesSheet = ss.getSheetByName(APP.sheetNames.species);
+      var speciesRows = speciesSheet ? Math.max(0, speciesSheet.getLastRow() - 1) : 0;
+      addCheck('Species catalog', speciesRows >= 9, speciesRows + ' species rows found.');
+    } catch (speciesError) {
+      addCheck('Species catalog', false, String(speciesError));
+    }
+  }
+
+  var settings = {};
+  try {
+    settings = getSettingsMap_();
+    addCheck('Settings readable', true, 'Settings sheet loaded.');
+  } catch (settingsError) {
+    addCheck('Settings readable', false, String(settingsError));
+  }
+
+  try {
+    var folderResult = getOutputFolderSafe_(settings.output_folder_id);
+    addCheck('Output folder', !folderResult.warning, folderResult.warning || ('Using folder: ' + folderResult.folder.getName()));
+    if (folderResult.warning) result.warnings.push(folderResult.warning);
+  } catch (folderError) {
+    addCheck('Output folder', false, String(folderError));
+  }
+
+  try {
+    var useTemplate = isTrueSetting_(settings.use_template_poster);
+    var templateId = trim_(settings.poster_template_file_id);
+    if (!useTemplate) {
+      addCheck('Poster template', true, 'Template mode is off; fallback renderer will be used.');
+    } else if (!hasConfiguredDriveId_(templateId)) {
+      addCheck('Poster template', false, 'Template mode is on, but no valid template ID is configured.');
+    } else {
+      var templateFile = DriveApp.getFileById(templateId);
+      var presentation = SlidesApp.openById(templateId);
+      var slides = presentation.getSlides();
+      var imagePlaceholder = slides && slides.length ? findTemplatePlaceholder_(slides[0], 'POSTER_IMAGE') : null;
+      addCheck('Poster template', true, templateFile.getName() + ' resolves.');
+      addCheck('POSTER_IMAGE placeholder', !!imagePlaceholder, imagePlaceholder ? 'Found on first slide.' : 'Not found on first slide.');
+    }
+  } catch (templateError) {
+    addCheck('Poster template', false, String(templateError));
+  }
+
+  addCheck('PDF sharing setting', true, 'share_output_with_link=' + String(settings.share_output_with_link || ''));
+  addCheck('Student link setting', true, 'show_student_output_links=' + String(settings.show_student_output_links || ''));
+  var e2eEnabled = isTrueSetting_(settings.allow_e2e_endpoint);
+  var e2eKey = trim_(settings.e2e_test_key);
+  addCheck('Web E2E endpoint', !e2eEnabled || !!e2eKey, e2eEnabled ? 'Enabled temporarily. Disable before class.' : 'Disabled by default.');
+  if (e2eEnabled) result.warnings.push('Web E2E endpoint is enabled temporarily. Disable it before class.');
+
+  Logger.log(JSON.stringify(result, null, 2));
+  return result;
+}
+
+function enableE2EEndpointForTesting() {
+  ensureProjectReady_();
+  setSettingValue_('allow_e2e_endpoint', 'TRUE');
+  setSettingValue_('e2e_test_key', 'codex-e2e-2026');
+  return 'Web E2E endpoint enabled temporarily. Run tests, then call disableE2EEndpointForTesting().';
+}
+
+function disableE2EEndpointForTesting() {
+  ensureProjectReady_();
+  setSettingValue_('allow_e2e_endpoint', 'FALSE');
+  return 'Web E2E endpoint disabled.';
+}
+
 /* ===== Client-facing API functions ===== */
 
 function getInitialConfig() {
-  try {
-    getSpreadsheet_();
-  } catch (e) {
-    setupProjectSheets();
-  }
-  seedDefaultSpeciesMasterIfNeeded_();
-  patchMissingSpeciesImageData_();
+  ensureProjectReady_();
 
   var settings = getSettingsMap_();
   var species = getSpeciesData_();
@@ -404,6 +527,7 @@ function getInitialConfig() {
 }
 
 function startMission(student) {
+  ensureProjectReady_();
   validateRequired_(student, ['firstName', 'lastName']);
 
   var ss = getSpreadsheet_();
@@ -466,6 +590,7 @@ function getEmbeddableImagePreview(url) {
 }
 
 function saveSpeciesChoice(studentKey, speciesId) {
+  ensureProjectReady_();
   validateString_(studentKey, 'studentKey');
   validateString_(speciesId, 'speciesId');
 
@@ -491,6 +616,7 @@ function saveSpeciesChoice(studentKey, speciesId) {
 }
 
 function saveEcology(studentKey, payload) {
+  ensureProjectReady_();
   validateString_(studentKey, 'studentKey');
   validateRequired_(payload, ['commonNameAnswer', 'scientificNameAnswer', 'statusAnswer', 'habitatType', 'dietType', 'adaptationType', 'ecosystemRole', 'ecologyExplanation']);
 
@@ -516,6 +642,7 @@ function saveEcology(studentKey, payload) {
 }
 
 function saveThreats(studentKey, payload) {
+  ensureProjectReady_();
   validateString_(studentKey, 'studentKey');
   validateRequired_(payload, ['threat1', 'threat1Reason', 'threat2', 'threat2Reason']);
 
@@ -543,6 +670,7 @@ function saveThreats(studentKey, payload) {
 }
 
 function saveActions(studentKey, payload) {
+  ensureProjectReady_();
   validateString_(studentKey, 'studentKey');
   validateRequired_(payload, ['action1', 'action2', 'actionExplanation']);
 
@@ -566,6 +694,7 @@ function saveActions(studentKey, payload) {
 }
 
 function finishMission(studentKey, payload) {
+  ensureProjectReady_();
   validateString_(studentKey, 'studentKey');
   validateRequired_(payload, ['whyItMatters']);
 
@@ -621,20 +750,23 @@ function finishMission(studentKey, payload) {
   };
 }
 
-function emergencySubmitMission(studentKey) {
+function emergencySubmitMission(studentKey, fields, selectedImageUrl) {
+  ensureProjectReady_();
   validateString_(studentKey, 'studentKey');
 
   var submission = getSubmissionByStudentKey_(studentKey);
-  var score = calculateCompletionScore_(submission);
+  var emergencyUpdates = mapEmergencyFieldsToSubmissionUpdates_(fields || {}, selectedImageUrl);
+  var mergedSubmission = mergeObjects_(submission, emergencyUpdates);
+  var score = calculateCompletionScore_(mergedSubmission);
 
-  updateSubmissionByStudentKey_(studentKey, {
-    timestamp_submit: new Date(),
-    score_out_of_100: score,
-    mission_stage: APP.stages.submitted,
-    submission_status: 'Emergency Submitted',
-    submission_message: 'Emergency submit used before mission was fully complete.',
-    submit_type: 'Emergency'
-  });
+  emergencyUpdates.timestamp_submit = new Date();
+  emergencyUpdates.score_out_of_100 = score;
+  emergencyUpdates.mission_stage = APP.stages.submitted;
+  emergencyUpdates.submission_status = 'Emergency Submitted';
+  emergencyUpdates.submission_message = 'Emergency submit used before mission was fully complete.';
+  emergencyUpdates.submit_type = 'Emergency';
+
+  updateSubmissionByStudentKey_(studentKey, emergencyUpdates);
 
   return {
     currentStage: APP.stages.submitted,
@@ -644,6 +776,41 @@ function emergencySubmitMission(studentKey) {
     studentCanViewFiles: false,
     pdfUrl: ''
   };
+}
+
+function mapEmergencyFieldsToSubmissionUpdates_(fields, selectedImageUrl) {
+  var updates = {};
+  var fieldMap = {
+    commonNameAnswer: 'identified_common_name',
+    scientificNameAnswer: 'identified_scientific_name',
+    statusAnswer: 'identified_status',
+    habitatType: 'habitat_type',
+    dietType: 'diet_type',
+    adaptationType: 'adaptation_type',
+    ecosystemRole: 'ecosystem_role',
+    ecologyExplanation: 'ecology_explanation',
+    threat1: 'threat_1',
+    threat1Reason: 'threat_1_reason',
+    threat2: 'threat_2',
+    threat2Reason: 'threat_2_reason',
+    action1: 'action_1',
+    action2: 'action_2',
+    actionExplanation: 'action_explanation',
+    whyItMatters: 'why_it_matters'
+  };
+
+  for (var key in fieldMap) {
+    if (!fieldMap.hasOwnProperty(key)) continue;
+    if (!fields || !fields.hasOwnProperty(key)) continue;
+    var value = trim_(fields[key]);
+    // Avoid wiping already-saved work with blank controls from stages the student has not reached.
+    if (value !== '') updates[fieldMap[key]] = value;
+  }
+
+  var imageUrl = trim_(selectedImageUrl || (fields && fields.selectedImageUrl));
+  if (imageUrl) updates.selected_image_url = imageUrl;
+
+  return updates;
 }
 
 function emptyPosterOutput_() {
@@ -1586,6 +1753,8 @@ function posterA_drawFooter_(slide, submission) {
 function generatePosterForSubmission_(submission) {
   var settings = getSettingsMap_();
   var warnings = [];
+  var shareWithLink = isTrueSetting_(settings.share_output_with_link);
+  var showStudentLinks = isTrueSetting_(settings.show_student_output_links);
 
   var folderResult = getOutputFolderSafe_(settings.output_folder_id);
   var outputFolder = folderResult.folder;
@@ -1637,7 +1806,9 @@ function generatePosterForSubmission_(submission) {
   }
 
   try {
-    if (pdfFile) pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    if (pdfFile && shareWithLink) {
+      pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    }
   } catch (shareError) {
     Logger.log('Sharing update failed: ' + shareError);
   }
@@ -1650,7 +1821,7 @@ function generatePosterForSubmission_(submission) {
     posterFileId: posterFile.getId(),
     pdfFileId: pdfFile ? pdfFile.getId() : '',
     warning: warnings.join(' '),
-    studentCanViewFiles: !!pdfFile
+    studentCanViewFiles: !!(pdfFile && shareWithLink && showStudentLinks)
   };
 }
 
