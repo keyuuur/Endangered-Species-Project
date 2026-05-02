@@ -497,8 +497,12 @@ function runSetupHealthCheck() {
   return result;
 }
 
-function enableE2EEndpointForTesting() {
+function enableE2EEndpointForTesting(adminKey) {
   ensureProjectReady_();
+  var configuredAdminKey = trim_(PropertiesService.getScriptProperties().getProperty('E2E_ADMIN_KEY'));
+  if (!configuredAdminKey || trim_(adminKey) !== configuredAdminKey) {
+    throw new Error('For safety, enable web E2E by setting allow_e2e_endpoint=TRUE and e2e_test_key in SETTINGS, or set Script Property E2E_ADMIN_KEY and pass it to this helper.');
+  }
   setSettingValue_('allow_e2e_endpoint', 'TRUE');
   setSettingValue_('e2e_test_key', 'codex-e2e-2026');
   return 'Web E2E endpoint enabled temporarily. Run tests, then call disableE2EEndpointForTesting().';
