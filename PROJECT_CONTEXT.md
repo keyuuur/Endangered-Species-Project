@@ -1,45 +1,64 @@
 # Endangered Species Rescue Mission - Project Context
 
-## What this project is
+## Purpose Of This File
 
-This is a Google Apps Script web app for elementary or middle-school style classroom use. A student picks an endangered species, researches it, fills out a guided sequence of prompts, and submits a final "rescue report" that generates classroom-ready visual outputs.
+This file is a handoff brief for another LLM, specifically GPT-5.5 Pro, to review the current codebase and suggest the next set of improvements. It should give enough project history and current-state context to avoid repeating failed iterations.
 
-The app is not a game in the traditional sense. It is a structured, mission-based learning experience with light game framing:
+The teacher/user is a non-traditional programmer learning as they go. Explanations should be plain English, concrete, and classroom-oriented.
 
-- students "start a mission"
-- choose one species to protect
-- gather ecological evidence
-- identify threats
-- propose conservation actions
-- make a final pitch
-- generate a finished poster and wall-tile PDF
+## Project Summary
 
-Primary goal: make research-and-writing feel engaging, guided, and rewarding without making the workflow confusing.
+This is a Google Apps Script classroom web app for a 9th grade endangered species research activity. Students complete a guided "conservation mission" instead of a plain worksheet. The app helps them choose an organism, collect ecology information, identify two threats, choose two conservation actions, select a final image, and submit a final rescue-report PDF.
 
-## Current product outputs
+The project is not a score-heavy game. It is a structured research and writing workflow with a mission-control visual theme.
 
-When a student finishes, the app generates:
+Core goals:
 
-- a Google Slides poster
-- a poster PDF
-- a separate wall-tiles PDF
+- Make endangered species research feel focused, visual, and student-friendly.
+- Keep the workflow simple enough for iPad classroom use.
+- Preserve the teacher's Google Apps Script workflow with no build tools or external frameworks.
+- Save final student artifacts into the configured Google Drive destination folder.
+- Produce a polished single-page PDF that science department colleagues can review.
 
-If sharing is enabled, the student can open those files from the submission-complete screen.
+## Current Repo And Deployment State
 
-## Platform / deployment facts
-
-- Platform: Google Apps Script web app
-- Frontend: `Index.html`, `ClientJavaScript.html`, `Styles.html`
-- Backend: `Code.gs`
-- Runtime: V8
+- Local repo path: `C:\Users\Keyur\Desktop\Claude Code YEET\Biology Games\Conservation LOCAL\Endangered Species Project LOCAL`
+- Current branch at last update: `5.5-attempt`
+- Current branch status at last update: clean and synced with `origin/5.5-attempt`
+- Latest relevant commit: `9ddce6b Add template-first poster renderer`
+- Apps Script project ID in `.clasp.json`: `1QSBVW3I45aY5cF4sZveGwueDdQx3ogny3Uh8ZIg9IWgboTEDXyKZP3tj`
+- Live deployment used for testing: `https://script.google.com/macros/s/AKfycby--cP2u7g7ZSi4MHRxhO3ejQ7589TG3YyDdmd_SIrpaav4QwIYBC1_B--e3PmgW7Xn/exec`
+- Most recent Apps Script deployment version from this branch: `53`
+- Manifest target access: `ANYONE`
+- Manifest execute-as: `USER_DEPLOYING`
+- Runtime: Google Apps Script V8
 - Time zone: `America/Chicago`
-- Web app access: `ANYONE`
-- Executes as: `USER_DEPLOYING`
-- Linked Apps Script project is configured through `.clasp.json`
 
-## Core UX flow
+Important deployment note:
 
-The app currently uses a linear stage flow:
+Apps Script deployment access sometimes flips or behaves as if it requires Google sign-in after redeployment. When that happens, the E2E endpoint returns Google sign-in HTML instead of JSON. The teacher has been manually changing the deployment access back to `Anyone`.
+
+## Source Files
+
+- `Code.gs`: backend, spreadsheet setup, species data, validation, submission saving, image helpers, poster/PDF generation, E2E test helper.
+- `Index.html`: raw Apps Script HTML shell and student stage markup.
+- `ClientJavaScript.html`: raw frontend JavaScript for stage transitions, local draft saving, validation, image preview fallbacks, Apps Script calls, and output-link rendering.
+- `Styles.html`: mission-control UI CSS.
+- `appsscript.json`: Apps Script manifest.
+- `.clasp.json`: Apps Script push target.
+- `PROJECT_CONTEXT.md`: this handoff file.
+
+Project constraints:
+
+- Keep everything compatible with Google Apps Script.
+- Do not add npm packages, bundlers, transpilers, or external frameworks.
+- Keep HTML/CSS/JS files as clean raw text that can be copied into Apps Script.
+- Optimize the student UI for iPad classroom use.
+- Do not change where student files are saved without teacher confirmation.
+
+## Current Student Flow
+
+The student flow is:
 
 1. `login`
 2. `species`
@@ -50,108 +69,91 @@ The app currently uses a linear stage flow:
 7. `final`
 8. `submitted`
 
-Important UX characteristics:
+Important behavior to preserve:
 
-- progress bar across the whole mission
-- back navigation between stages
-- draft persistence in local storage
-- emergency submit option if class ends early
-- one selected species per mission
-- exactly 2 threats and exactly 2 conservation actions
-- final stage includes a 3-image chooser plus a short "why it matters" explanation
+- Students complete one organism per mission.
+- Students choose exactly two threats.
+- Students choose exactly two conservation actions.
+- Students choose one final image from three options.
+- Students write a "why this species matters" final response.
+- Draft work is saved in browser local storage.
+- Emergency submit remains available for classroom timing issues.
+- The final student-facing artifact is a PDF only.
 
-## Current visual state
+## Current Student-Facing UI
 
-The current UI is functional, readable, and classroom-safe, but visually conservative. It uses an earthy museum/workbook look:
+The web app has already been redesigned into a "Mission Control / Conservation HQ" dashboard style.
 
-- parchment / paper backgrounds
-- dark green hero header
-- rounded cards and soft shadows
-- simple grid layouts
-- practical form styling
+Current visual language:
 
-This style works, but it is not yet distinctive or especially memorable. The next design pass should improve visual appeal, atmosphere, and delight without making the app harder for students to use.
+- Left mission rail with stages.
+- Top progress/status bar.
+- Dark teal/green conservation dashboard.
+- Card-based stage screens.
+- Final image selection UI.
+- Emergency submit affordance.
+- Final submitted screen shows only the poster PDF link.
 
-## Current architecture
+Known UI state:
 
-### Frontend responsibilities
+- The main web app functionality is considered solid.
+- Earlier image-preview bugs were fixed so species images and final image choices are visible instead of blank selectable boxes.
+- Wall tiles were removed from the student-facing experience because they were not useful.
+- Slide links were removed from the student-facing final output because PDFs looked better and were the only artifact the teacher wanted.
 
-`Index.html`
+## Current Output Model
 
-- stage markup
-- modal markup
-- overall shell and layout structure
+The final output should be:
 
-`ClientJavaScript.html`
+- One rescue-report PDF in the configured Drive folder.
+- No wall-tile PDF.
+- No student-facing Google Slides link.
 
-- stage transitions and progress
-- form validation
-- mission start / save / finish calls to Apps Script
-- local draft persistence and restore
-- image loading logic for species gallery and final image chooser
-- graceful fallback when browser image embedding fails
+Implementation detail:
 
-`Styles.html`
+The app still creates a Google Slides presentation internally because Apps Script can export Slides to PDF reliably. That internal Slide is treated as a render artifact. After the PDF is exported, the internal Slide is trashed by `archiveInternalPosterSlide_`.
 
-- current theme and layout system
-- species grid, panels, buttons, modal, image choice styling
+Important consequence:
 
-### Backend responsibilities
+- `poster_file_id` may point to a trashed internal Slide. This is intentional in the current PDF-only workflow.
+- `poster_pdf_url` is the student-facing artifact.
 
-`Code.gs`
+## Data And Settings
 
-- Apps Script entry points
-- spreadsheet setup and recovery
-- species catalog defaults
-- submission saving and stage updates
-- poster / PDF / wall-tile generation
-- output sharing
-- image normalization and image blob retrieval
-- research links and species data loading
+Main sheets:
 
-## Data model
+- `SPECIES_MASTER`
+- `STUDENT_SUBMISSIONS`
+- `SETTINGS`
 
-There are 3 main sheets:
+Configured output folder:
 
-### `SPECIES_MASTER`
+- `APP.outputFolderId = 1BESzdmXkmswTBApTqgiAeBZxLHgQo2mY`
 
-Stores available organisms and teacher-editable species data, including:
+Default settings currently include:
 
-- ids and names
-- biome / status / region
-- briefing text
-- hints
-- 3 image URLs
-- 2 research links
+- `poster_template_file_id = PASTE_TEMPLATE_FILE_ID_HERE`
+- `output_folder_id = APP.outputFolderId`
+- `teacher_email = PASTE_TEACHER_EMAIL_HERE`
+- `project_title = Endangered Species Rescue Mission`
+- `share_output_with_link = TRUE`
+- `show_student_output_links = TRUE`
+- `e2e_test_key = ''`
+- `poster_template_version = template_first_v1`
+- `use_template_poster = TRUE`
+- `poster_render_mode = template`
 
-### `STUDENT_SUBMISSIONS`
+Legacy columns still exist in `STUDENT_SUBMISSIONS`:
 
-Stores student progress and final outputs, including:
+- `poster_slide_url`
+- `tile_pdf_file_id`
+- `tile_pdf_url`
 
-- student identity fields
-- selected species
-- mission stage
-- ecology answers
-- 2 threats + explanations
-- 2 actions + explanation
-- why-it-matters response
-- selected image URL
-- scoring / submission status
-- generated file ids and file URLs
+These are retained for schema compatibility. Do not reintroduce wall tiles or student-facing Slides unless the teacher explicitly asks.
 
-### `SETTINGS`
+## Species Catalog
 
-Stores configuration such as:
-
-- output folder
-- teacher email
-- project title
-- sharing behavior
-- optional poster template file id
-
-## Built-in species catalog
-
-The default catalog currently includes 9 species:
+Default species currently include:
 
 - Hawksbill Turtle
 - Whale Shark
@@ -163,160 +165,153 @@ The default catalog currently includes 9 species:
 - Black-footed Ferret
 - Addax
 
-The app can also be teacher-customized through the species sheet.
+The E2E helper uses 9th-grade-style sample writing rather than "GPT scientist" writing. This was intentional because the teacher wants examples that resemble plausible student responses.
 
-## Important current implementation details
+## Poster/PDF Target
 
-### Image handling
+The desired final PDF is a polished one-page endangered species rescue report inspired by this local reference image:
 
-This is the most recently stabilized area of the project.
+`C:\Users\Keyur\Downloads\ChatGPT Image Apr 23, 2026, 07_35_52 PM.png`
 
-The app now supports a more defensive image pipeline because some URLs worked for final Slides generation but did not render reliably in browser `<img>` tags.
+The target visual style includes:
 
-Current image strategy:
+- Dark green conservation-report frame.
+- Large species title and scientific name.
+- Strong crest/logo in the upper left.
+- Large organism image panel.
+- Quick facts card.
+- Ecology card.
+- Threats card.
+- Conservation actions card.
+- "Why this species matters" card.
+- Footer call-to-action.
+- Decorative ocean/leaf/coral background elements.
+- Clean icon system.
+- No text overlap.
+- Stronger typography than default Arial-heavy output.
 
-- normalize common image URL formats before use
-- support Google Drive-style links more safely
-- support Wikimedia direct file paths
-- support Dropbox raw image conversion
-- if the browser cannot embed an image directly, request a server-fetched preview data URI
-- disable broken final image options instead of letting students click empty boxes
-- preserve the student's manual final image choice across stage revisits when possible
+## Current Poster Renderer State
 
-This matters because image reliability was a major practical bug in earlier testing.
+The current production path is "template-first" in name, but this needs an important warning.
 
-### Poster generation
+Current behavior:
 
-The app supports 2 poster-generation paths:
+- `generatePosterForSubmission_` calls `ensurePolishedPosterTemplate_`.
+- `ensurePolishedPosterTemplate_` creates or reuses a Slides template named `_Template - Endangered Species Rescue Report`.
+- `buildPosterFromTemplate_` copies that template, replaces text placeholders, inserts the selected image into `POSTER_IMAGE`, exports PDF, and trashes the internal Slide.
+- If the template path fails, `buildFallbackPoster_` uses the older coordinate-drawn renderer.
 
-- template-based poster generation if a valid Slides template id is configured
-- fallback fully programmatic poster generation if not
+Critical lesson from the latest iteration:
 
-The wall-tile PDF is also generated programmatically.
+The generated template was created by Apps Script drawing primitives, so visually it still looked too much like the old code-drawn poster. The teacher reviewed the Addax output from the template-first attempt and said it was not the desired end product. The architecture improved, but the visual design did not improve enough.
 
-### State / recovery
+What this means:
 
-The frontend persists drafts in local storage so a refresh does not immediately destroy work. The student can also emergency-submit incomplete work.
+- The next serious improvement should not be another small coordinate tweak.
+- The next serious improvement should use a truly designed Google Slides template or a high-quality static designed background with Apps Script placing text/image into it.
+- The current auto-created template can remain as a fallback, but should not be considered the final design solution.
 
-## Iteration history and why the current version looks like this
+## Important Poster Functions
 
-Based on git history plus the current working tree, the project appears to have evolved in this order:
+Key functions in `Code.gs`:
 
-### 1. Initial basic Apps Script app
+- `runThreeEndToEndTests()`: creates 3 randomized test submissions and returns PDF URLs.
+- `doGet(e)`: serves the app and exposes the E2E test endpoint when authorized.
+- `generatePosterForSubmission_(submission)`: main poster/PDF generation flow.
+- `ensurePolishedPosterTemplate_(settings, outputFolder)`: creates/reuses the current generated template.
+- `createPolishedPosterTemplate_(outputFolder)`: creates the current generated template through Apps Script shapes.
+- `drawPolishedPosterTemplate_(slide)`: draws the current generated template.
+- `buildPosterFromTemplate_(templateId, outputFolder, posterName, submission)`: copies template, replaces placeholders, inserts image, saves.
+- `replaceTemplateImagePlaceholder_(slide, imageUrl)`: finds the `POSTER_IMAGE` element by title and inserts the selected image.
+- `buildFallbackPoster_(outputFolder, posterName, submission)`: older code-drawn poster fallback.
+- `exportSlidesFileAsPdfWithRetry_(presentationId, posterName, outputFolder)`: exports the Slide artifact as PDF.
+- `archiveInternalPosterSlide_(posterFile)`: trashes the internal Slide after PDF export.
 
-Early commits were mostly file-by-file scaffolding. The app likely started as a straightforward classroom form with minimal polish and minimal structure.
+## E2E Testing
 
-### 2. Simplification for classroom practicality
+The E2E endpoint is:
 
-Commit history shows the project reduced threats and actions down to 2 each and removed a previous image chooser at one point.
+`https://script.google.com/macros/s/AKfycby--cP2u7g7ZSi4MHRxhO3ejQ7589TG3YyDdmd_SIrpaav4QwIYBC1_B--e3PmgW7Xn/exec?action=runE2ETests&key=codex-e2e-2026`
 
-Reasoning:
+Notes:
 
-- fewer choices reduces cognitive overload
-- shorter inputs fit classroom time limits better
-- less UI complexity improves reliability and load performance
+- The fallback key `codex-e2e-2026` exists for testing convenience and is not a strong production secret.
+- If Apps Script access is set correctly, the endpoint returns JSON with three PDF URLs.
+- If access is broken, it returns Google sign-in HTML.
+- Current expected successful output is 3 PDFs, not 6 files, because Slides are internal and trashed.
 
-### 3. Better setup and content guidance
+Recent successful test after version 53:
 
-Later commits added:
+- Addax PDF generated successfully.
+- Blue Whale PDF generated successfully.
+- Bornean Orangutan PDF generated successfully.
 
-- automatic spreadsheet setup
-- improved research links
-- cleanup of dead code
+But the Addax visual result was judged not close enough to the ideal target.
 
-Reasoning:
+## Iteration History
 
-- reduce teacher setup friction
-- make the tool more usable out of the box
-- keep the student flow more guided
+High-level path to current state:
 
-### 4. Richer final deliverables and stronger navigation
+1. Started as a basic Apps Script classroom form.
+2. Simplified into a guided research workflow with one species, two threats, and two conservation actions.
+3. Added spreadsheet setup, species defaults, student submissions, settings, and research links.
+4. Added poster generation and image selection.
+5. Fixed image display reliability so organism-choice images and final image choices no longer showed blank boxes.
+6. Redesigned the web app into a mission-control dashboard style.
+7. Added wall tiles as a possible final output, then removed them because they were not useful.
+8. Iterated heavily on the final PDF renderer to fix missing text, fragile icons, cramped conservation actions, image stretching, and overlapping text.
+9. Removed student-facing Slides and kept PDF-only output.
+10. Merged/pushed a stable version to main, then created the `5.5-attempt` branch for a stronger model review and improvement attempt.
+11. Cleaned PDF-only workflow, removed duplicated renderer residue, and kept old wall-tile columns only for schema compatibility.
+12. Added a "template-first" renderer path, but the template was generated by code and therefore did not achieve the desired visual leap.
 
-A later major feature commit added:
+## Current Problem To Solve
 
-- full poster generation
-- wall-tile PDF
-- back navigation
-- scientific name field
-- image chooser
+The core app works. The main remaining problem is final PDF visual quality.
 
-Reasoning:
+The current final product is functional but still not close enough to the ideal polished rescue-report mockup. The teacher wants something visually impressive enough to showcase to the science department.
 
-- make the final artifact feel rewarding and classroom-display ready
-- give students more control over their final product
-- allow revision instead of forcing linear one-way completion
+Most likely next direction:
 
-### 5. Recent stabilization pass for image reliability
+- Keep the app flow and data model stable.
+- Keep PDF-only output.
+- Replace the generated-template approach with a real design template.
+- Use Apps Script only to fill content into that design.
 
-The current working version includes a non-trivial image reliability pass beyond the last commit history snapshot. It fixed the bug where:
+Potential implementation paths:
 
-- species cards could show blank images during species selection
-- the final 3-image chooser could show empty boxes that were still selectable
-- the final generated poster could still contain the image, proving the problem was browser rendering rather than total image failure
+- Create a real Google Slides template manually, set `poster_template_file_id`, and update `buildPosterFromTemplate_` to support all needed placeholders and image frames.
+- Use a high-quality static background image matching the ideal poster and overlay dynamic text/image boxes in Apps Script.
+- If using a static background, ensure text areas are large enough for 9th-grade responses and that exports stay crisp.
+- Keep `buildFallbackPoster_` as a safety fallback.
 
-Reasoning behind the fix:
+## Review Priorities For GPT-5.5 Pro
 
-- separate browser-display concerns from backend-fetch concerns
-- normalize image URLs before use
-- provide fallback previews through Apps Script
-- make failure states explicit and non-confusing in the UI
+Please review with these priorities:
 
-### 6. Small polish pass after stabilization
+1. Identify the best architecture for making the final PDF match the target mockup more closely inside Apps Script constraints.
+2. Decide whether the current generated-template code should be removed, kept as fallback, or converted to consume a real hand-designed template.
+3. Check for bugs or fragility in `generatePosterForSubmission_`, template creation, image insertion, PDF export, and Slide trashing.
+4. Check text fitting strategy. Character truncation is not the same as visual fit in Slides.
+5. Check whether icon/SVG insertion is safe enough or should be replaced with static template assets.
+6. Check whether E2E testing should be made more secure without making teacher testing painful.
+7. Suggest cleanup only if it improves reliability or maintainability without disrupting the working classroom flow.
 
-Recent cleanup also improved:
+## Things To Avoid
 
-- preserving selected final images more predictably
-- restoring draft state more cleanly
-- using species-specific briefing text
-- showing both research links
-- cleaning some encoded back-button text issues
+- Do not reintroduce wall tiles as a student output.
+- Do not expose the internal Google Slide to students.
+- Do not change the Drive output folder without teacher confirmation.
+- Do not add npm packages, frameworks, or build steps.
+- Do not redesign the already-working web app while trying to fix the PDF.
+- Do not assume the auto-generated template solved the visual problem.
+- Do not rely on runtime SVG icons unless exported PDFs prove they render correctly.
+- Do not optimize for desktop over iPad classroom use.
 
-## What should not be broken in the next design pass
+## Teacher Preference Notes
 
-Any redesign should preserve these behavioral truths:
-
-- stage order stays clear and easy to follow
-- progress bar remains understandable
-- forms stay easy for students to complete quickly
-- image selection remains stable and visible
-- emergency submit remains obvious
-- generated outputs and Apps Script backend behavior remain unchanged unless explicitly requested
-- accessibility and readability matter more than flashy visuals
-
-## What is open for redesign
-
-These areas are good candidates for layout and visual exploration:
-
-- hero/header treatment
-- stage framing and transitions
-- species selection card design
-- progress visualization
-- reference panel styling
-- final pitch / image selection presentation
-- overall typography, color system, and atmosphere
-
-Good directions to explore:
-
-- more immersive "mission control" / conservation HQ framing
-- cleaner editorial / museum-exhibit framing
-- brighter kid-friendly expedition aesthetic
-- stronger visual hierarchy and more memorable cards
-
-## Design objective for the next LLM
-
-The next LLM should propose visual directions and layout variants, not rewrite the whole product concept.
-
-It should assume:
-
-- the educational flow is already working
-- the main need is a more beautiful and distinctive UI
-- the redesign must still be practical for young students in a classroom
-- implementation should remain realistic for Apps Script HTML/CSS/JS, not a heavy framework rebuild
-
-## Source of truth files
-
-- [Code.gs](./Code.gs)
-- [Index.html](./Index.html)
-- [ClientJavaScript.html](./ClientJavaScript.html)
-- [Styles.html](./Styles.html)
-- [appsscript.json](./appsscript.json)
+- The teacher wants plain English explanations and step-by-step test checklists.
+- The teacher is comfortable with Git as a safety net and wants meaningful improvements, not overly timid edits.
+- The teacher prefers functional classroom reliability over clever architecture.
+- The teacher wants final PDF examples to look like plausible student work, not overly polished scientific writing.
+- The teacher is open to a stronger model proposing a better approach if the current Apps Script drawing method is the limiting factor.

@@ -108,6 +108,7 @@ var APP = {
 /* ===== Test function — run from GAS editor to verify poster generation ===== */
 
 function runThreeEndToEndTests() {
+  ensureProjectReady_();
   var timestamp = Utilities.formatDate(new Date(), 'America/Chicago', 'yyyyMMddHHmm');
   var cases = [
     {
@@ -161,8 +162,62 @@ function runThreeEndToEndTests() {
       action_explanation: 'Safer shipping lanes, slower ship speeds, and cleaner oceans can lower the risks blue whales face.',
       why_it_matters: 'Blue whales are the biggest animals on Earth, and protecting them helps keep ocean ecosystems healthier.',
       selected_image_url: ''
+    },
+    {
+      first_name: 'Test', last_name: 'OrangutanD_' + timestamp, hour: '4',
+      species_id: 'bornean-orangutan',
+      common_name: 'Bornean Orangutan', scientific_name: 'Pongo pygmaeus',
+      biome: 'Rainforest', identified_status: 'Critically Endangered',
+      habitat_type: 'Rainforest', diet_type: 'Herbivore',
+      adaptation_type: 'Long limbs', ecosystem_role: 'Seed disperser',
+      ecology_explanation: 'Bornean orangutans spread seeds when they eat fruit, so they help new rainforest plants grow.',
+      threat_1: 'Habitat loss',
+      threat_1_reason: 'Palm oil farms and logging can cut down the rainforest where orangutans live. When the forest is gone, they lose food, shelter, and safe places to move.',
+      threat_2: 'Poaching / overhunting',
+      threat_2_reason: 'Some orangutans are taken for the illegal pet trade, especially babies. This hurts the population because orangutans already reproduce very slowly.',
+      action_1: 'Protected areas / habitat restoration', action_2: 'Education / public awareness',
+      action_explanation: 'Protecting rainforest areas and teaching people about palm oil choices can help orangutans keep their habitat.',
+      why_it_matters: 'Saving orangutans also protects the rainforest and many other animals that live in the same trees.',
+      selected_image_url: ''
+    },
+    {
+      first_name: 'Test', last_name: 'WhaleSharkE_' + timestamp, hour: '5',
+      species_id: 'whale-shark',
+      common_name: 'Whale Shark', scientific_name: 'Rhincodon typus',
+      biome: 'Marine', identified_status: 'Endangered',
+      habitat_type: 'Open ocean', diet_type: 'Filter feeder',
+      adaptation_type: 'Migration', ecosystem_role: 'Consumer',
+      ecology_explanation: 'Whale sharks eat tiny plankton and small fish, which makes them part of the ocean food web even though they are huge.',
+      threat_1: 'Overfishing',
+      threat_1_reason: 'Whale sharks can get caught by fishing gear by accident. This is dangerous because they grow slowly and do not have many babies.',
+      threat_2: 'Pollution',
+      threat_2_reason: 'Plastic and dirty water can hurt the ocean areas where whale sharks feed. They may swallow trash while filter feeding.',
+      action_1: 'Research and monitoring', action_2: 'Pollution reduction',
+      action_explanation: 'Tracking whale sharks and reducing plastic pollution can help people protect the places where they feed and migrate.',
+      why_it_matters: 'Whale sharks show that the ocean is healthy, and protecting them also protects other ocean life.',
+      selected_image_url: ''
+    },
+    {
+      first_name: 'Test', last_name: 'ForestElephantF_' + timestamp, hour: '6',
+      species_id: 'african-forest-elephant',
+      common_name: 'African Forest Elephant', scientific_name: 'Loxodonta cyclotis',
+      biome: 'Rainforest', identified_status: 'Critically Endangered',
+      habitat_type: 'Rainforest', diet_type: 'Herbivore',
+      adaptation_type: 'Strong teeth / beak', ecosystem_role: 'Seed disperser',
+      ecology_explanation: 'African forest elephants eat fruit and spread seeds through the forest, so they help the rainforest keep growing.',
+      threat_1: 'Poaching / overhunting',
+      threat_1_reason: 'Some elephants are killed for ivory, which lowers the population and removes important adults from the herd.',
+      threat_2: 'Habitat loss',
+      threat_2_reason: 'Logging and roads can break the forest into smaller pieces. That makes it harder for elephants to find food and safe paths.',
+      action_1: 'Anti-poaching / stronger laws', action_2: 'Protected areas / habitat restoration',
+      action_explanation: 'Stronger anti-poaching patrols and protected forest corridors can help elephant herds survive.',
+      why_it_matters: 'Forest elephants help shape the rainforest, so protecting them helps protect the whole forest ecosystem.',
+      selected_image_url: ''
     }
   ];
+
+  shuffleArray_(cases);
+  cases = cases.slice(0, 3);
 
   var results = [];
   for (var i = 0; i < cases.length; i++) {
@@ -183,6 +238,16 @@ function runThreeEndToEndTests() {
     }
   }
   return results;
+}
+
+function shuffleArray_(items) {
+  for (var i = items.length - 1; i > 0; i--) {
+    var j = Math.floor(Math.random() * (i + 1));
+    var temp = items[i];
+    items[i] = items[j];
+    items[j] = temp;
+  }
+  return items;
 }
 
 function testPosterGeneration() {
@@ -215,9 +280,21 @@ function testPosterGeneration() {
 /* ===== Web app entry points ===== */
 
 function doGet(e) {
-  if (e && e.parameter && e.parameter.action === 'runE2ETests' &&
-      e.parameter.key === 'codex-e2e-2026') {
+  if (e && e.parameter && e.parameter.action === 'runE2ETests') {
+    if (!isE2ETestRequestAllowed_(e.parameter.key)) {
+      return ContentService
+        .createTextOutput(JSON.stringify({
+          ok: false,
+          error: 'Web E2E tests are disabled or the provided key is invalid.'
+        }, null, 2))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
     var results = runThreeEndToEndTests();
+    if (String(e.parameter.disableAfter || '').toLowerCase() === 'true') {
+      try { setSettingValue_('allow_e2e_endpoint', 'FALSE'); } catch (disableErr) {
+        Logger.log('Could not disable E2E endpoint after test run: ' + disableErr);
+      }
+    }
     return ContentService
       .createTextOutput(JSON.stringify(results, null, 2))
       .setMimeType(ContentService.MimeType.JSON);
@@ -233,6 +310,34 @@ function doGet(e) {
 
 function include(filename) {
   return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+function isE2ETestRequestAllowed_(providedKey) {
+  var settings = {};
+  try {
+    ensureProjectReady_();
+    settings = getSettingsMap_();
+  } catch (readyError) {
+    Logger.log('E2E setup/settings read failed: ' + readyError);
+    return false;
+  }
+
+  if (!isTrueSetting_(settings.allow_e2e_endpoint)) return false;
+
+  var configuredKey = '';
+  try {
+    configuredKey = trim_(PropertiesService.getScriptProperties().getProperty('E2E_TEST_KEY'));
+  } catch (propError) {
+    Logger.log('E2E key property read failed: ' + propError);
+  }
+  if (!configuredKey) {
+    try {
+      configuredKey = trim_(settings.e2e_test_key);
+    } catch (settingsError) {
+      Logger.log('E2E key settings read failed: ' + settingsError);
+    }
+  }
+  return !!configuredKey && trim_(providedKey) === configuredKey;
 }
 
 /* ===== Setup ===== */
@@ -256,6 +361,8 @@ function setupProjectSheets() {
     'action_1', 'action_2', 'action_3', 'action_explanation',
     'why_it_matters', 'selected_image_url',
     'score_out_of_100', 'submit_type', 'submission_message',
+    // Legacy output columns retained for old sheet compatibility.
+    // Do not reintroduce wall tiles or student-facing Slides unless explicitly requested.
     'poster_file_id', 'poster_slide_url', 'pdf_file_id', 'poster_pdf_url',
     'tile_pdf_file_id', 'tile_pdf_url',
     'submission_status'
@@ -269,9 +376,12 @@ function setupProjectSheets() {
     ['project_title', APP.projectTitle],
     ['share_output_with_link', 'TRUE'],
     ['show_student_output_links', 'TRUE'],
-    ['use_template_poster', 'FALSE'],
-    // Poster renderer: "fallback_v2" (default) or "template".
-    ['poster_render_mode', 'fallback_v2']
+    ['e2e_test_key', ''],
+    ['allow_e2e_endpoint', 'FALSE'],
+    ['poster_template_version', 'template_first_v1'],
+    ['use_template_poster', 'TRUE'],
+    // Poster renderer: "template" is the production path; "fallback_v2" is the safety net.
+    ['poster_render_mode', 'template']
   ];
 
   ensureSheetHeaders_(ss, APP.sheetNames.species, speciesHeaders);
@@ -296,16 +406,118 @@ function resetProjectSheetsDangerously() {
   return setupProjectSheets();
 }
 
+function ensureProjectReady_() {
+  setupProjectSheets();
+  seedDefaultSpeciesMasterIfNeeded_();
+  patchMissingSpeciesImageData_();
+}
+
+function runSetupHealthCheck() {
+  var result = { ok: true, checks: [], warnings: [] };
+
+  function addCheck(name, ok, detail) {
+    result.checks.push({ name: name, ok: !!ok, detail: detail || '' });
+    if (!ok) result.ok = false;
+  }
+
+  try {
+    ensureProjectReady_();
+    addCheck('Safe setup', true, 'Required sheets and defaults were checked non-destructively.');
+  } catch (setupError) {
+    addCheck('Safe setup', false, String(setupError));
+  }
+
+  var ss = null;
+  try {
+    ss = getSpreadsheet_();
+    addCheck('Spreadsheet', true, ss.getName() + ' (' + ss.getId() + ')');
+  } catch (spreadsheetError) {
+    addCheck('Spreadsheet', false, String(spreadsheetError));
+  }
+
+  if (ss) {
+    var requiredSheets = [APP.sheetNames.species, APP.sheetNames.submissions, APP.sheetNames.settings];
+    for (var i = 0; i < requiredSheets.length; i++) {
+      var sheet = ss.getSheetByName(requiredSheets[i]);
+      addCheck('Sheet: ' + requiredSheets[i], !!sheet, sheet ? 'Found with ' + Math.max(0, sheet.getLastRow() - 1) + ' data rows.' : 'Missing.');
+    }
+
+    try {
+      var speciesSheet = ss.getSheetByName(APP.sheetNames.species);
+      var speciesRows = speciesSheet ? Math.max(0, speciesSheet.getLastRow() - 1) : 0;
+      addCheck('Species catalog', speciesRows >= 9, speciesRows + ' species rows found.');
+    } catch (speciesError) {
+      addCheck('Species catalog', false, String(speciesError));
+    }
+  }
+
+  var settings = {};
+  try {
+    settings = getSettingsMap_();
+    addCheck('Settings readable', true, 'Settings sheet loaded.');
+  } catch (settingsError) {
+    addCheck('Settings readable', false, String(settingsError));
+  }
+
+  try {
+    var folderResult = getOutputFolderSafe_(settings.output_folder_id);
+    addCheck('Output folder', !folderResult.warning, folderResult.warning || ('Using folder: ' + folderResult.folder.getName()));
+    if (folderResult.warning) result.warnings.push(folderResult.warning);
+  } catch (folderError) {
+    addCheck('Output folder', false, String(folderError));
+  }
+
+  try {
+    var useTemplate = isTrueSetting_(settings.use_template_poster);
+    var templateId = trim_(settings.poster_template_file_id);
+    if (!useTemplate) {
+      addCheck('Poster template', true, 'Template mode is off; fallback renderer will be used.');
+    } else if (!hasConfiguredDriveId_(templateId)) {
+      addCheck('Poster template', false, 'Template mode is on, but no valid template ID is configured.');
+    } else {
+      var templateFile = DriveApp.getFileById(templateId);
+      var presentation = SlidesApp.openById(templateId);
+      var slides = presentation.getSlides();
+      var imagePlaceholder = slides && slides.length ? findTemplatePlaceholder_(slides[0], 'POSTER_IMAGE') : null;
+      addCheck('Poster template', true, templateFile.getName() + ' resolves.');
+      addCheck('POSTER_IMAGE placeholder', !!imagePlaceholder, imagePlaceholder ? 'Found on first slide.' : 'Not found on first slide.');
+    }
+  } catch (templateError) {
+    addCheck('Poster template', false, String(templateError));
+  }
+
+  addCheck('PDF sharing setting', true, 'share_output_with_link=' + String(settings.share_output_with_link || ''));
+  addCheck('Student link setting', true, 'show_student_output_links=' + String(settings.show_student_output_links || ''));
+  var e2eEnabled = isTrueSetting_(settings.allow_e2e_endpoint);
+  var e2eKey = trim_(settings.e2e_test_key);
+  addCheck('Web E2E endpoint', !e2eEnabled || !!e2eKey, e2eEnabled ? 'Enabled temporarily. Disable before class.' : 'Disabled by default.');
+  if (e2eEnabled) result.warnings.push('Web E2E endpoint is enabled temporarily. Disable it before class.');
+
+  Logger.log(JSON.stringify(result, null, 2));
+  return result;
+}
+
+function enableE2EEndpointForTesting(adminKey) {
+  ensureProjectReady_();
+  var configuredAdminKey = trim_(PropertiesService.getScriptProperties().getProperty('E2E_ADMIN_KEY'));
+  if (!configuredAdminKey || trim_(adminKey) !== configuredAdminKey) {
+    throw new Error('For safety, enable web E2E by setting allow_e2e_endpoint=TRUE and e2e_test_key in SETTINGS, or set Script Property E2E_ADMIN_KEY and pass it to this helper.');
+  }
+  setSettingValue_('allow_e2e_endpoint', 'TRUE');
+  setSettingValue_('e2e_test_key', 'codex-e2e-2026');
+  return 'Web E2E endpoint enabled temporarily. Run tests, then call disableE2EEndpointForTesting().';
+}
+
+function disableE2EEndpointForTesting() {
+  ensureProjectReady_();
+  setSettingValue_('allow_e2e_endpoint', 'FALSE');
+  return 'Web E2E endpoint disabled.';
+}
+
 /* ===== Client-facing API functions ===== */
 
 function getInitialConfig() {
-  try {
-    getSpreadsheet_();
-  } catch (e) {
-    setupProjectSheets();
-  }
-  seedDefaultSpeciesMasterIfNeeded_();
-  patchMissingSpeciesImageData_();
+  ensureProjectReady_();
 
   var settings = getSettingsMap_();
   var species = getSpeciesData_();
@@ -319,6 +531,7 @@ function getInitialConfig() {
 }
 
 function startMission(student) {
+  ensureProjectReady_();
   validateRequired_(student, ['firstName', 'lastName']);
 
   var ss = getSpreadsheet_();
@@ -381,6 +594,7 @@ function getEmbeddableImagePreview(url) {
 }
 
 function saveSpeciesChoice(studentKey, speciesId) {
+  ensureProjectReady_();
   validateString_(studentKey, 'studentKey');
   validateString_(speciesId, 'speciesId');
 
@@ -406,6 +620,7 @@ function saveSpeciesChoice(studentKey, speciesId) {
 }
 
 function saveEcology(studentKey, payload) {
+  ensureProjectReady_();
   validateString_(studentKey, 'studentKey');
   validateRequired_(payload, ['commonNameAnswer', 'scientificNameAnswer', 'statusAnswer', 'habitatType', 'dietType', 'adaptationType', 'ecosystemRole', 'ecologyExplanation']);
 
@@ -431,6 +646,7 @@ function saveEcology(studentKey, payload) {
 }
 
 function saveThreats(studentKey, payload) {
+  ensureProjectReady_();
   validateString_(studentKey, 'studentKey');
   validateRequired_(payload, ['threat1', 'threat1Reason', 'threat2', 'threat2Reason']);
 
@@ -458,6 +674,7 @@ function saveThreats(studentKey, payload) {
 }
 
 function saveActions(studentKey, payload) {
+  ensureProjectReady_();
   validateString_(studentKey, 'studentKey');
   validateRequired_(payload, ['action1', 'action2', 'actionExplanation']);
 
@@ -481,6 +698,7 @@ function saveActions(studentKey, payload) {
 }
 
 function finishMission(studentKey, payload) {
+  ensureProjectReady_();
   validateString_(studentKey, 'studentKey');
   validateRequired_(payload, ['whyItMatters']);
 
@@ -536,20 +754,23 @@ function finishMission(studentKey, payload) {
   };
 }
 
-function emergencySubmitMission(studentKey) {
+function emergencySubmitMission(studentKey, fields, selectedImageUrl) {
+  ensureProjectReady_();
   validateString_(studentKey, 'studentKey');
 
   var submission = getSubmissionByStudentKey_(studentKey);
-  var score = calculateCompletionScore_(submission);
+  var emergencyUpdates = mapEmergencyFieldsToSubmissionUpdates_(fields || {}, selectedImageUrl);
+  var mergedSubmission = mergeObjects_(submission, emergencyUpdates);
+  var score = calculateCompletionScore_(mergedSubmission);
 
-  updateSubmissionByStudentKey_(studentKey, {
-    timestamp_submit: new Date(),
-    score_out_of_100: score,
-    mission_stage: APP.stages.submitted,
-    submission_status: 'Emergency Submitted',
-    submission_message: 'Emergency submit used before mission was fully complete.',
-    submit_type: 'Emergency'
-  });
+  emergencyUpdates.timestamp_submit = new Date();
+  emergencyUpdates.score_out_of_100 = score;
+  emergencyUpdates.mission_stage = APP.stages.submitted;
+  emergencyUpdates.submission_status = 'Emergency Submitted';
+  emergencyUpdates.submission_message = 'Emergency submit used before mission was fully complete.';
+  emergencyUpdates.submit_type = 'Emergency';
+
+  updateSubmissionByStudentKey_(studentKey, emergencyUpdates);
 
   return {
     currentStage: APP.stages.submitted,
@@ -559,6 +780,41 @@ function emergencySubmitMission(studentKey) {
     studentCanViewFiles: false,
     pdfUrl: ''
   };
+}
+
+function mapEmergencyFieldsToSubmissionUpdates_(fields, selectedImageUrl) {
+  var updates = {};
+  var fieldMap = {
+    commonNameAnswer: 'identified_common_name',
+    scientificNameAnswer: 'identified_scientific_name',
+    statusAnswer: 'identified_status',
+    habitatType: 'habitat_type',
+    dietType: 'diet_type',
+    adaptationType: 'adaptation_type',
+    ecosystemRole: 'ecosystem_role',
+    ecologyExplanation: 'ecology_explanation',
+    threat1: 'threat_1',
+    threat1Reason: 'threat_1_reason',
+    threat2: 'threat_2',
+    threat2Reason: 'threat_2_reason',
+    action1: 'action_1',
+    action2: 'action_2',
+    actionExplanation: 'action_explanation',
+    whyItMatters: 'why_it_matters'
+  };
+
+  for (var key in fieldMap) {
+    if (!fieldMap.hasOwnProperty(key)) continue;
+    if (!fields || !fields.hasOwnProperty(key)) continue;
+    var value = trim_(fields[key]);
+    // Avoid wiping already-saved work with blank controls from stages the student has not reached.
+    if (value !== '') updates[fieldMap[key]] = value;
+  }
+
+  var imageUrl = trim_(selectedImageUrl || (fields && fields.selectedImageUrl));
+  if (imageUrl) updates.selected_image_url = imageUrl;
+
+  return updates;
 }
 
 function emptyPosterOutput_() {
@@ -838,7 +1094,7 @@ function posterIconFallbackLabel_(type) {
     'info': 'i',
     'turtle-coral': ''
   };
-  return labels[type] || '•';
+  return Object.prototype.hasOwnProperty.call(labels, type) ? labels[type] : '';
 }
 
 function pDotDivider_(slide, x, y, width, colorHex, dotSize, gap) {
@@ -896,6 +1152,320 @@ function posterActionLabelShort_(text, fallback) {
   return clipText_(trim_(text), 18);
 }
 
+function buildPosterTemplateReplacements_(submission) {
+  var facts = getPosterFactPack_(submission);
+  var speciesName = trim_(submission.common_name) || 'this species';
+  var studentName = [submission.first_name, submission.last_name].join(' ').trim();
+  var status = trim_(submission.identified_status) || trim_(submission.status) || '';
+  var threat1 = trim_(submission.threat_1) || 'Threat 1';
+  var threat2 = trim_(submission.threat_2) || 'Threat 2';
+  var action1 = posterActionLabelShort_(trim_(submission.action_1), 'Protect Habitat');
+  var action2 = posterActionLabelShort_(trim_(submission.action_2), 'Reduce Pollution');
+
+  return {
+    '{{STUDENT_NAME}}': studentName || 'Student',
+    '{{PERIOD}}': trim_(submission.hour) ? 'Period ' + trim_(submission.hour) : '',
+    '{{COMMON_NAME}}': speciesName,
+    '{{SCIENTIFIC_NAME}}': trim_(submission.scientific_name) || '',
+    '{{STATUS_BADGE}}': status.toUpperCase(),
+    '{{HABITAT}}': facts.habitat,
+    '{{DIET}}': facts.diet,
+    '{{LENGTH}}': facts.length,
+    '{{WEIGHT}}': facts.weight,
+    '{{LOCATION}}': facts.location,
+    '{{ECOSYSTEM_ROLE}}': posterDisplayText_(trim_(submission.ecosystem_role_text) || trim_(submission.ecosystem_role), 132),
+    '{{ECOLOGY_EXPLANATION}}': posterDisplayText_(submission.ecology_explanation, 150),
+    '{{THREAT_1_LABEL}}': 'THREAT 1 - ' + posterThreatLabelShort_(threat1),
+    '{{THREAT_1_REASON}}': posterDisplayText_(submission.threat_1_reason, 158),
+    '{{THREAT_2_LABEL}}': 'THREAT 2 - ' + posterThreatLabelShort_(threat2),
+    '{{THREAT_2_REASON}}': posterDisplayText_(submission.threat_2_reason, 144),
+    '{{ACTION_1}}': posterActionCaption_(action1, 15, 34),
+    '{{ACTION_2}}': posterActionCaption_(action2, 15, 34),
+    '{{ACTION_3}}': 'Community\nSupport',
+    '{{ACTION_4}}': 'Stronger\nLaws',
+    '{{WHY_IT_MATTERS}}': posterDisplayText_(submission.why_it_matters, 170),
+    '{{SPECIES_CTA}}': 'Protect ' + speciesName.toLowerCase() + ' today',
+    '{{HABITAT_ECOLOGY}}': posterDisplayText_(submission.ecology_explanation, 180),
+    '{{MAJOR_THREATS}}': posterDisplayText_(threat1 + ': ' + submission.threat_1_reason + ' ' + threat2 + ': ' + submission.threat_2_reason, 220),
+    '{{CONSERVATION_ACTIONS}}': action1 + '\n' + action2,
+    '{{WHY_THIS_SPECIES_MATTERS}}': posterDisplayText_(submission.why_it_matters, 170)
+  };
+}
+
+function setPageElementTitleSafe_(pageElement, title) {
+  try { pageElement.setTitle(title); } catch (titleErr) {
+    Logger.log('Could not set element title "' + title + '": ' + titleErr);
+  }
+  return pageElement;
+}
+
+function insertPlaceholderText_(slide, title, text, x, y, w, h, opts) {
+  return setPageElementTitleSafe_(pText_(slide, text, x, y, w, h, opts || {}), title);
+}
+
+function markPlaceholder_(shape, title) {
+  return setPageElementTitleSafe_(shape, title);
+}
+
+function clearSlide_(slide) {
+  var els = slide.getPageElements();
+  for (var i = els.length - 1; i >= 0; i--) {
+    try { els[i].remove(); } catch (removeErr) {}
+  }
+}
+
+function createPolishedPosterTemplate_(outputFolder) {
+  var templateName = '_Template - Endangered Species Rescue Report';
+  var pres = SlidesApp.create(templateName);
+  var file = DriveApp.getFileById(pres.getId());
+  var slide = pres.getSlides()[0];
+  clearSlide_(slide);
+
+  var bg = hexToRgb_(POSTER_A.bg);
+  slide.getBackground().setSolidFill(bg.r, bg.g, bg.b);
+  drawPolishedPosterTemplate_(slide);
+  pres.saveAndClose();
+
+  // Keep the template out of the student output folder when possible so clearing
+  // the destination folder only removes student PDFs.
+  try { DriveApp.getRootFolder().addFile(file); } catch (rootErr) {}
+  try {
+    if (outputFolder) outputFolder.removeFile(file);
+  } catch (removeFromOutputErr) {}
+  return file;
+}
+
+function drawPolishedPosterTemplate_(slide) {
+  pRect_(slide, 0, 0, 720, 405, POSTER_A.bg, POSTER_A.bg, 0, false);
+  pRect_(slide, 5, 4, 710, 397, '#08261d', '#144f42', 1.4, true);
+  pRect_(slide, 10, 9, 700, 386, '#05261d', '#1e6b59', 1.1, true);
+  pRect_(slide, 12, 11, 696, 78, '#06291f', null, 0, true);
+
+  pDecorIcon_(slide, 'waves-decor', 352, 27, 150, 43, '#275d51');
+  pDecorIcon_(slide, 'turtle-coral', 490, 20, 82, 58, '#1e5a4d');
+  pDecorIcon_(slide, 'coral-decor', 596, 14, 92, 64, '#2f6d5c');
+
+  pCircle_(slide, 20, 16, 56, '#102f26', '#d7d2ad', 1.5);
+  pCircle_(slide, 25, 21, 46, '#efe9ce', '#97bc8f', 0.9);
+  pCircle_(slide, 31, 27, 34, '#0b5a4e', '#0b5a4e', 0.5);
+  pDecorIcon_(slide, 'turtle-coral', 35, 31, 26, 26, '#f5efd4');
+
+  pText_(slide, 'ENDANGERED SPECIES RESCUE REPORT', 90, 17, 360, 13,
+    { font: 'Montserrat', size: 9, bold: true, color: '#d6d9a9' });
+  insertPlaceholderText_(slide, 'COMMON_NAME', '{{COMMON_NAME}}', 90, 30, 390, 34,
+    { font: 'Merriweather', size: 30, bold: true, color: '#fffdf5' });
+  insertPlaceholderText_(slide, 'SCIENTIFIC_NAME', '{{SCIENTIFIC_NAME}}', 90, 65, 330, 17,
+    { font: 'Merriweather', size: 13, italic: true, bold: true, color: '#a7ce71' });
+  pText_(slide, 'Student:', 562, 22, 38, 10,
+    { font: 'Montserrat', size: 7, bold: true, color: '#a8d566', align: SlidesApp.ParagraphAlignment.END });
+  insertPlaceholderText_(slide, 'STUDENT_NAME', '{{STUDENT_NAME}}', 602, 22, 88, 10,
+    { font: 'Arial', size: 7, color: '#fffaf0' });
+  insertPlaceholderText_(slide, 'PERIOD', '{{PERIOD}}', 602, 34, 88, 9,
+    { font: 'Arial', size: 6, color: '#d4dfc3' });
+
+  drawTemplatePhotoAndFacts_(slide);
+  drawTemplateEcology_(slide);
+  drawTemplateThreats_(slide);
+  drawTemplateConservation_(slide);
+  drawTemplateWhyMatters_(slide);
+  drawTemplateFooter_(slide);
+}
+
+function drawTemplatePhotoAndFacts_(slide) {
+  pRect_(slide, 16, 94, 272, 155, '#e8dfc7', '#e8dfc7', 1, true);
+  pRect_(slide, 20, 98, 264, 147, '#0b2d27', '#cdd5b6', 1, true);
+  markPlaceholder_(pRect_(slide, 23, 101, 258, 141, '#14372f', '#14372f', 0, true), 'POSTER_IMAGE');
+
+  pRect_(slide, 16, 256, 272, 126, POSTER_A.cream, '#e2d7b9', 1.1, true);
+  pRect_(slide, 16, 256, 272, 22, '#0d5848', null, 0, true);
+  pCircle_(slide, 26, 260, 15, '#2d7c68', '#9ec69f', 0.8);
+  pIcon_(slide, 'leaf', 30, 263, 8, '#ecf7dc', 1.3);
+  pText_(slide, 'QUICK FACTS', 52, 261, 124, 12,
+    { font: 'Montserrat', size: 9, bold: true, color: '#f6f7dd' });
+  insertPlaceholderText_(slide, 'STATUS_BADGE', '{{STATUS_BADGE}}', 185, 262, 88, 9,
+    { font: 'Montserrat', size: 5, bold: true, color: '#c6372e', align: SlidesApp.ParagraphAlignment.CENTER });
+
+  var rows = [
+    ['leaf', 'Habitat', '{{HABITAT}}'],
+    ['waves', 'Diet', '{{DIET}}'],
+    ['ruler', 'Length', '{{LENGTH}}'],
+    ['weight', 'Weight', '{{WEIGHT}}'],
+    ['pin', 'Location', '{{LOCATION}}']
+  ];
+  var y = 292;
+  for (var i = 0; i < rows.length; i++) {
+    pIcon_(slide, rows[i][0], 30, y - 1, 11, '#0d5848', 1.6);
+    pText_(slide, rows[i][1], 52, y - 2, 74, 11,
+      { font: 'Montserrat', size: 7.5, bold: true, color: '#17483d' });
+    insertPlaceholderText_(slide, rows[i][1].toUpperCase(), rows[i][2], 132, y - 2, 136, 11,
+      { font: 'Arial', size: 7.5, color: '#173b34' });
+    if (i < rows.length - 1) pDotDivider_(slide, 32, y + 16, 224, '#d6ccb6', 1.3, 5);
+    y += 19;
+  }
+}
+
+function drawTemplateEcology_(slide) {
+  pRect_(slide, 296, 94, 176, 172, POSTER_A.mint, '#d3dedc', 1, true);
+  pCircle_(slide, 306, 104, 24, '#087a73', '#c9e6df', 0.9);
+  pIcon_(slide, 'leaf', 313, 111, 11, '#f3fff7', 1.6);
+  pText_(slide, 'ECOLOGY', 344, 108, 110, 15,
+    { font: 'Montserrat', size: 10, bold: true, color: '#14747a' });
+  pRect_(slide, 306, 132, 156, 122, '#fbfdfb', '#97c1c2', 0.8, true);
+  pIcon_(slide, 'coral', 318, 152, 28, '#187577', 1.6);
+  pText_(slide, 'ECOSYSTEM ROLE', 360, 149, 88, 10,
+    { font: 'Montserrat', size: 6.5, bold: true, color: '#127078' });
+  insertPlaceholderText_(slide, 'ECOSYSTEM_ROLE', '{{ECOSYSTEM_ROLE}}', 360, 162, 86, 29,
+    { font: 'Arial', size: 6.4, color: '#253c38' });
+  pDotDivider_(slide, 320, 203, 120, '#6ab9bc', 1.4, 5);
+  pIcon_(slide, 'waves', 318, 217, 28, '#187577', 1.6);
+  pText_(slide, 'ECOLOGICAL EXPLANATION', 360, 214, 94, 10,
+    { font: 'Montserrat', size: 6.2, bold: true, color: '#127078' });
+  insertPlaceholderText_(slide, 'ECOLOGY_EXPLANATION', '{{ECOLOGY_EXPLANATION}}', 360, 227, 88, 22,
+    { font: 'Arial', size: 6.2, color: '#253c38' });
+}
+
+function drawTemplateThreats_(slide) {
+  pRect_(slide, 480, 94, 222, 172, POSTER_A.blush, '#efd3c4', 1, true);
+  pCircle_(slide, 490, 104, 24, '#e66f5c', '#f4b6a5', 0.9);
+  pText_(slide, '!', 490, 108, 24, 12,
+    { font: 'Arial', size: 11, bold: true, color: '#fff8f2', align: SlidesApp.ParagraphAlignment.CENTER });
+  pText_(slide, 'THREATS', 524, 108, 118, 15,
+    { font: 'Montserrat', size: 10, bold: true, color: '#cf4638' });
+  pRect_(slide, 490, 132, 202, 122, '#fff8f0', '#ed9b8b', 0.8, true);
+  pIcon_(slide, 'coral', 504, 154, 28, '#a3221c', 1.5);
+  insertPlaceholderText_(slide, 'THREAT_1_LABEL', '{{THREAT_1_LABEL}}', 548, 148, 126, 10,
+    { font: 'Montserrat', size: 6.5, bold: true, color: '#c92722' });
+  insertPlaceholderText_(slide, 'THREAT_1_REASON', '{{THREAT_1_REASON}}', 548, 162, 126, 32,
+    { font: 'Arial', size: 6.4, color: '#31231f' });
+  pDotDivider_(slide, 504, 204, 160, '#e99b8d', 1.4, 5);
+  pIcon_(slide, 'thermometer', 504, 218, 28, '#a3221c', 1.5);
+  insertPlaceholderText_(slide, 'THREAT_2_LABEL', '{{THREAT_2_LABEL}}', 548, 214, 126, 10,
+    { font: 'Montserrat', size: 6.5, bold: true, color: '#c92722' });
+  insertPlaceholderText_(slide, 'THREAT_2_REASON', '{{THREAT_2_REASON}}', 548, 228, 126, 20,
+    { font: 'Arial', size: 6.2, color: '#31231f' });
+}
+
+function drawTemplateConservation_(slide) {
+  pRect_(slide, 296, 270, 176, 94, POSTER_A.lavender, '#c9bedf', 1, true);
+  pCircle_(slide, 306, 278, 18, '#60499f', '#b8aad8', 0.9);
+  pIcon_(slide, 'shield', 311, 283, 8, '#f6f2ff', 1.4);
+  pText_(slide, 'CONSERVATION ACTIONS', 334, 281, 128, 11,
+    { font: 'Montserrat', size: 7.5, bold: true, color: '#46328f' });
+  pText_(slide, 'Actions we can take to help protect this species:', 306, 299, 156, 9,
+    { font: 'Arial', size: 5.6, color: '#3b315f' });
+
+  var actions = [
+    ['ACTION_1', '{{ACTION_1}}', 'shield', 306],
+    ['ACTION_2', '{{ACTION_2}}', 'turtle', 347],
+    ['ACTION_3', '{{ACTION_3}}', 'community', 388],
+    ['ACTION_4', '{{ACTION_4}}', 'scales', 429]
+  ];
+  for (var i = 0; i < actions.length; i++) {
+    var x = actions[i][3];
+    pCircle_(slide, x, 314, 28, '#f6f1ff', '#b7a3d6', 0.8);
+    pIcon_(slide, actions[i][2], x + 7, 321, 14, '#48318a', 1.4);
+    insertPlaceholderText_(slide, actions[i][0], actions[i][1], x - 2, 344, 32, 14,
+      { font: 'Arial', size: 4.1, color: '#31215d', align: SlidesApp.ParagraphAlignment.CENTER });
+    if (i < actions.length - 1) pLine_(slide, x + 35, 318, 1, '#cdbfe2');
+  }
+}
+
+function drawTemplateWhyMatters_(slide) {
+  pRect_(slide, 480, 270, 222, 94, POSTER_A.sage, '#c5d6b9', 1, true);
+  pCircle_(slide, 490, 278, 18, '#2d7541', '#9cc797', 0.9);
+  pIcon_(slide, 'heart', 495, 284, 8, '#f4fff2', 1.4);
+  pText_(slide, 'WHY THIS SPECIES MATTERS', 518, 281, 160, 11,
+    { font: 'Montserrat', size: 7.5, bold: true, color: '#2e6d36' });
+  pRect_(slide, 490, 302, 202, 52, '#f9fcf4', '#9fc491', 0.8, true);
+  pCircle_(slide, 504, 313, 30, '#eef7df', '#78a66f', 0.8);
+  pDecorIcon_(slide, 'turtle-coral', 511, 320, 18, 18, '#2e6d36');
+  insertPlaceholderText_(slide, 'WHY_IT_MATTERS', '{{WHY_IT_MATTERS}}', 548, 314, 126, 30,
+    { font: 'Arial', size: 6.2, color: '#283c27' });
+}
+
+function drawTemplateFooter_(slide) {
+  pRect_(slide, 16, 370, 686, 22, '#06291f', '#1f6a58', 1, true);
+  pCircle_(slide, 28, 373, 16, '#0c5747', '#8fc79d', 0.9);
+  pIcon_(slide, 'leaf', 33, 378, 7, '#ecf7dc', 1.2);
+  pText_(slide, 'A healthy ecosystem depends on every species.', 56, 376, 218, 12,
+    { font: 'Merriweather', size: 7, color: '#fff5de' });
+  insertPlaceholderText_(slide, 'SPECIES_CTA', '{{SPECIES_CTA}}', 276, 376, 166, 12,
+    { font: 'Merriweather', size: 7, italic: true, bold: true, color: '#a7ce71' });
+  pText_(slide, 'for a stronger, more resilient tomorrow.', 438, 376, 186, 12,
+    { font: 'Merriweather', size: 7, color: '#fff5de' });
+  pDecorIcon_(slide, 'coral-decor', 638, 371, 54, 20, '#2d6f5b');
+}
+
+function findTemplatePlaceholder_(slide, title) {
+  var elements = slide.getPageElements();
+  for (var i = 0; i < elements.length; i++) {
+    try {
+      if (elements[i].getTitle && elements[i].getTitle() === title) return elements[i];
+    } catch (titleErr) {}
+  }
+  return null;
+}
+
+function drawImageFrame_(slide, x, y, w, h) {
+  pRect_(slide, x - 1.5, y - 1.5, w + 3, 2, '#f4ecd6', null, 0, false);
+  pRect_(slide, x - 1.5, y + h - 0.5, w + 3, 2, '#f4ecd6', null, 0, false);
+  pRect_(slide, x - 1.5, y - 1.5, 2, h + 3, '#f4ecd6', null, 0, false);
+  pRect_(slide, x + w - 0.5, y - 1.5, 2, h + 3, '#f4ecd6', null, 0, false);
+}
+
+function replaceTemplateImagePlaceholder_(slide, imageUrl) {
+  var placeholder = findTemplatePlaceholder_(slide, 'POSTER_IMAGE');
+  if (!placeholder || !imageUrl) return false;
+  var x = placeholder.getLeft();
+  var y = placeholder.getTop();
+  var w = placeholder.getWidth();
+  var h = placeholder.getHeight();
+  try { placeholder.remove(); } catch (removeErr) {}
+  var inserted = insertSlideImageIntoBox_(slide, imageUrl, x, y, w, h);
+  if (inserted) drawImageFrame_(slide, x, y, w, h);
+  return inserted;
+}
+
+function setSettingValue_(key, value) {
+  var ss = getSpreadsheet_();
+  var sheet = ss.getSheetByName(APP.sheetNames.settings);
+  if (!sheet) return;
+  var values = sheet.getDataRange().getValues();
+  for (var i = 1; i < values.length; i++) {
+    if (trim_(values[i][0]) === key) {
+      sheet.getRange(i + 1, 2).setValue(value);
+      SpreadsheetApp.flush();
+      return;
+    }
+  }
+  sheet.appendRow([key, value]);
+  SpreadsheetApp.flush();
+}
+
+function ensurePolishedPosterTemplate_(settings, outputFolder) {
+  var configuredId = trim_(settings.poster_template_file_id);
+  var expectedVersion = 'template_first_v1';
+  var currentVersion = trim_(settings.poster_template_version);
+  if (hasConfiguredDriveId_(configuredId) && currentVersion === expectedVersion) {
+    try {
+      DriveApp.getFileById(configuredId);
+      setSettingValue_('use_template_poster', 'TRUE');
+      setSettingValue_('poster_render_mode', 'template');
+      return configuredId;
+    } catch (existingErr) {
+      Logger.log('Configured poster template unavailable, creating a new one: ' + existingErr);
+    }
+  }
+
+  var newTemplate = createPolishedPosterTemplate_(outputFolder);
+  var templateId = newTemplate.getId();
+  setSettingValue_('poster_template_file_id', templateId);
+  setSettingValue_('poster_template_version', expectedVersion);
+  setSettingValue_('use_template_poster', 'TRUE');
+  setSettingValue_('poster_render_mode', 'template');
+  return templateId;
+}
+
 function posterStatusPalette_(status) {
   var value = String(status || '').toLowerCase();
   if (value.indexOf('critical') >= 0) {
@@ -907,35 +1477,28 @@ function posterStatusPalette_(status) {
   return { fill: '#2f6b39', border: '#8dbc8f', text: '#eef7ea' };
 }
 
-/* Override icon fallback labels so failed icon inserts degrade to empty circles
- * instead of noisy placeholder bullets/letters.
- */
-function posterIconFallbackLabel_(type) {
-  var labels = {
-    'turtle': '',
-    'leaf': '',
-    'heart': '',
-    'coral': '',
-    'waves': '',
-    'alert': '!',
-    'thermometer': '',
-    'shield': '',
-    'community': '',
-    'scales': '',
-    'pin': '',
-    'ruler': '',
-    'weight': '',
-    'info': 'i',
-    'turtle-coral': ''
-  };
-  return Object.prototype.hasOwnProperty.call(labels, type) ? labels[type] : '';
-}
-
 function clipText_(text, maxChars) {
   var clean = trim_(text).replace(/\s+/g, ' ');
   if (!clean) return '';
   if (!maxChars || clean.length <= maxChars) return clean;
   return clean.substring(0, Math.max(0, maxChars - 3)).trim() + '...';
+}
+
+function posterDisplayText_(text, maxChars) {
+  var clean = trim_(text).replace(/\s+/g, ' ');
+  if (!clean || !maxChars || clean.length <= maxChars) return clean;
+
+  var sentenceCut = -1;
+  var sentenceMarks = ['. ', '! ', '? '];
+  for (var i = 0; i < sentenceMarks.length; i++) {
+    var markIndex = clean.lastIndexOf(sentenceMarks[i], maxChars - 1);
+    if (markIndex > sentenceCut) sentenceCut = markIndex + 1;
+  }
+  if (sentenceCut >= Math.floor(maxChars * 0.58)) return clean.substring(0, sentenceCut).trim();
+
+  var wordCut = clean.lastIndexOf(' ', maxChars - 3);
+  if (wordCut < Math.floor(maxChars * 0.55)) wordCut = maxChars - 3;
+  return clean.substring(0, wordCut).trim() + '...';
 }
 
 function getPosterFactPack_(submission) {
@@ -995,184 +1558,6 @@ var POSTER_A = {
   mutedLine: '#c5cbbf'
 };
 
-function posterA_drawHeader_(slide, submission, studentName) {
-  pRect_(slide, 0, 0, 720, 405, POSTER_A.bg, POSTER_A.bg, 0, false);
-  pRect_(slide, 6, 4, 708, 397, '#08261d', '#124d41', 1, true);
-  pRect_(slide, 10, 8, 700, 389, POSTER_A.bg, '#0f5448', 1, true);
-  pRect_(slide, 12, 10, 696, 82, POSTER_A.headerBg, null, 0, true);
-  pRect_(slide, 12, 88, 696, 2, POSTER_A.bgBorder, null, 0, false);
-
-  pDecorIcon_(slide, 'waves-decor', 430, 28, 152, 46, '#2a6a5d');
-  pDecorIcon_(slide, 'turtle', 520, 24, 62, 62, '#1d574b');
-  pDecorIcon_(slide, 'coral-decor', 596, 18, 92, 64, '#275f52');
-
-  pCircle_(slide, 18, 14, 52, '#0f5f53', '#cfceb2', 1.2);
-  pCircle_(slide, 22, 18, 44, '#093a31', '#cfceb2', 1);
-  pText_(slide, 'ESR', 22, 31, 44, 12,
-    { font: 'Montserrat', size: 11, bold: true, color: '#f4ecd6', align: SlidesApp.ParagraphAlignment.CENTER });
-
-  pText_(slide, 'ENDANGERED SPECIES RESCUE REPORT', 86, 14, 430, 14,
-    { font: 'Montserrat', size: 10, bold: true, color: '#cfd9a8' });
-  pText_(slide, submission.common_name || 'Species Rescue', 86, 22, 430, 40,
-    { font: 'Merriweather', size: 30, bold: true, color: '#ffffff' });
-  pText_(slide, submission.scientific_name || '', 86, 62, 430, 18,
-    { font: 'Merriweather', size: 14, italic: true, color: POSTER_A.accent });
-
-  var attribution = 'Student: ' + studentName;
-  if (trim_(submission.hour)) attribution += '    Period ' + trim_(submission.hour);
-  pText_(slide, attribution, 498, 18, 196, 12,
-    { font: 'Lato', size: 7, color: '#cadb9d', align: SlidesApp.ParagraphAlignment.END });
-}
-
-function posterA_drawPhotoCol_(slide, submission) {
-  pRect_(slide, 16, 94, 248, 156, '#efe7d4', '#d7d7ba', 1, true);
-  pRect_(slide, 20, 98, 240, 148, '#0c2f28', '#7ba394', 0.8, true);
-
-  var facts = getPosterFactPack_(submission);
-  pRect_(slide, 16, 254, 248, 128, POSTER_A.cream, '#d6d4bb', 1, true);
-  pRect_(slide, 16, 254, 248, 20, '#0b5144', null, 0, true);
-  pCircle_(slide, 24, 257, 14, '#2f7868', '#9ad1b0', 1);
-  pText_(slide, 'QUICK FACTS', 44, 258, 126, 12,
-    { font: 'Montserrat', size: 9, bold: true, color: '#f2f8e6' });
-
-  var status = trim_(submission.identified_status);
-  if (status) {
-    var statusTone = posterStatusPalette_(status);
-    pRect_(slide, 176, 258, 78, 11, statusTone.fill, statusTone.border, 0.7, true);
-    pText_(slide, status.toUpperCase(), 180, 259, 70, 8,
-      { font: 'Montserrat', size: 5, bold: true, color: statusTone.text, align: SlidesApp.ParagraphAlignment.CENTER });
-  }
-
-  var rows = [
-    ['leaf', 'Habitat', facts.habitat],
-    ['waves', 'Diet', facts.diet],
-    ['ruler',  'Length', facts.length],
-    ['weight', 'Weight', facts.weight],
-    ['pin', 'Location', facts.location]
-  ];
-  var ry = 282;
-  for (var i = 0; i < rows.length; i++) {
-    pIcon_(slide, rows[i][0], 28, ry + 1, 12, '#19584b', 2.1);
-    pText_(slide, rows[i][1], 50, ry, 72, 14,
-      { font: 'Montserrat', size: 8, bold: true, color: '#174a3f' });
-    pText_(slide, clipText_(rows[i][2], 38), 126, ry, 124, 14,
-      { font: 'Lato', size: 8, color: POSTER_A.body });
-    if (i < rows.length - 1) pLine_(slide, 28, ry + 14, 216, '#d4d0bb');
-    ry += 22;
-  }
-}
-
-function posterA_drawEcologyCol_(slide, submission) {
-  pRect_(slide, 278, 96, 192, 170, POSTER_A.mint, '#9bc3c7', 1, true);
-  pIconBadge_(slide, 'leaf', 286, 100, 22, '#0f7f79', '#0f6a63', 1, '#eefbf9', 4);
-  pText_(slide, 'ECOLOGY', 318, 104, 140, 18,
-    { font: 'Montserrat', size: 12, bold: true, color: '#166f74' });
-
-  pRect_(slide, 288, 128, 172, 128, '#f6faf8', '#95bcc0', 1, true);
-  var roleText = trim_(submission.ecosystem_role_text) || trim_(submission.ecosystem_role) || '';
-  pIconBadge_(slide, 'coral', 298, 140, 24, '#f7ffff', '#6aaab0', 1, '#157077', 4);
-  pText_(slide, 'ECOSYSTEM ROLE', 332, 142, 116, 12,
-    { font: 'Montserrat', size: 8, bold: true, color: '#12656a' });
-  pText_(slide, clipText_(roleText, 148), 332, 154, 116, 30,
-    { font: 'Lato', size: 8, color: POSTER_A.body });
-
-  pText_(slide, '·····································', 300, 195, 150, 8,
-    { font: 'Arial', size: 6, color: '#79bac2', align: SlidesApp.ParagraphAlignment.CENTER });
-
-  pRect_(slide, 288, 202, 176, 56, '#f5f8f5', '#95bcc0', 1, true);
-  pIconBadge_(slide, 'waves', 294, 208, 18, '#ffffff', '#6aaab0', 1, '#157077', 3);
-  pText_(slide, 'ECOLOGICAL EXPLANATION', 318, 208, 136, 12,
-    { font: 'Montserrat', size: 8, bold: true, color: '#12656a' });
-  pText_(slide, clipText_(submission.ecology_explanation, 170), 318, 220, 136, 34,
-    { font: 'Lato', size: 8, color: POSTER_A.body });
-}
-
-function posterA_drawThreatsCol_(slide, submission) {
-  pRect_(slide, 476, 96, 226, 168, POSTER_A.blush, '#efb7a7', 1, true);
-  pIconBadge_(slide, 'alert', 482, 100, 22, '#ec856d', '#df765f', 1, '#fff5f2', 3);
-  pText_(slide, 'THREATS', 514, 104, 166, 18,
-    { font: 'Montserrat', size: 12, bold: true, color: '#c43d2f' });
-
-  var t1 = trim_(submission.threat_1) || 'Threat 1';
-  pRect_(slide, 486, 126, 208, 68, '#fff7f2', '#efab99', 1, true);
-  pIcon_(slide, 'coral', 496, 144, 24, '#ad2c23', 2.1);
-  pText_(slide, 'THREAT 1 \u2013 ' + t1.toUpperCase(), 530, 132, 154, 12,
-    { font: 'Montserrat', size: 8, bold: true, color: '#c53e31' });
-  pText_(slide, clipText_(submission.threat_1_reason, 170), 530, 146, 154, 40,
-    { font: 'Lato', size: 8, color: '#4a2b26' });
-
-  pText_(slide, '·····································', 520, 198, 150, 8,
-    { font: 'Arial', size: 6, color: '#f0aa97', align: SlidesApp.ParagraphAlignment.CENTER });
-
-  var t2 = trim_(submission.threat_2) || 'Threat 2';
-  pRect_(slide, 486, 206, 208, 50, '#fff7f2', '#efab99', 1, true);
-  pIcon_(slide, 'thermometer', 496, 220, 24, '#ad2c23', 2.1);
-  pText_(slide, 'THREAT 2 \u2013 ' + t2.toUpperCase(), 530, 212, 154, 12,
-    { font: 'Montserrat', size: 8, bold: true, color: '#c53e31' });
-  pText_(slide, clipText_(submission.threat_2_reason, 150), 530, 226, 154, 24,
-    { font: 'Lato', size: 8, color: '#4a2b26' });
-}
-
-function posterA_drawConservation_(slide, submission) {
-  pRect_(slide, 280, 270, 190, 108, POSTER_A.lavender, '#b9acd9', 1, true);
-  pIconBadge_(slide, 'shield', 286, 274, 20, '#6b58a9', '#5e4b99', 1, '#f4efff', 3);
-  pText_(slide, 'CONSERVATION ACTIONS', 314, 276, 150, 14,
-    { font: 'Montserrat', size: 9, bold: true, color: '#4f3b8f' });
-
-  var speciesLabel = (trim_(submission.common_name) || 'this species').toLowerCase();
-  pText_(slide, 'Actions we can take to help protect ' + speciesLabel + ':', 288, 298, 170, 12,
-    { font: 'Lato', size: 7, italic: true, color: '#4a3f78' });
-
-  var a1 = clipText_(trim_(submission.action_1) || '', 28);
-  var a2 = clipText_(trim_(submission.action_2) || '', 30);
-  var actions = [
-    { glyph: 'leaf', label: a1 || 'Protected areas' },
-    { glyph: 'turtle', label: a2 || 'Reduce pollution' },
-    { glyph: 'community', label: 'Support conservation education' },
-    { glyph: 'scales', label: 'Enforce laws against poaching' }
-  ];
-  var baseX = 292;
-  var cellW = 42;
-  for (var i = 0; i < actions.length; i++) {
-    var cx = baseX + i * cellW;
-    pCircle_(slide, cx, 318, 26, '#f6f2fd', '#a391cf', 1);
-    pIcon_(slide, actions[i].glyph, cx + 5, 323, 16, '#5e4b99', 1.9);
-    pText_(slide, clipText_(actions[i].label, 22), cx - 5, 346, 36, 26,
-      { font: 'Lato', size: 5, color: '#3f3366', align: SlidesApp.ParagraphAlignment.CENTER });
-  }
-}
-
-function posterA_drawWhyMatters_(slide, submission) {
-  pRect_(slide, 476, 270, 226, 108, POSTER_A.sage, '#adc4a2', 1, true);
-  pIconBadge_(slide, 'leaf', 482, 274, 20, '#3a7a46', '#2f693b', 1, '#eff9ef', 3);
-  pText_(slide, 'WHY THIS SPECIES MATTERS', 510, 276, 184, 14,
-    { font: 'Montserrat', size: 9, bold: true, color: '#2f6e38' });
-
-  pCircle_(slide, 492, 302, 48, '#f8fbf3', '#85ab80', 1);
-  pIcon_(slide, 'turtle-coral', 502, 312, 28, '#356c3e', 1.7);
-
-  pText_(slide, clipText_(trim_(submission.why_it_matters) || '', 220), 548, 304, 144, 66,
-    { font: 'Lato', size: 8, color: '#28412a' });
-}
-
-function posterA_drawFooter_(slide, submission) {
-  pRect_(slide, 12, 384, 696, 18, POSTER_A.headerBg, '#1a6556', 1, true);
-  pIconBadge_(slide, 'leaf', 22, 386, 14, '#0f5448', '#8cc8a8', 1, '#dbeedc', 3);
-  pDecorIcon_(slide, 'coral-decor', 640, 384, 56, 18, '#255e51');
-
-  var speciesName = (trim_(submission.common_name) || 'this species').toLowerCase();
-  var prefix = 'A healthy ecosystem depends on every species. ';
-  var highlight = 'Protect ' + speciesName + ' today ';
-  var tail = 'for a stronger, more resilient tomorrow.';
-  pText_(slide, prefix, 42, 389, 258, 12,
-    { font: 'Merriweather', size: 8, color: '#dbeedc' });
-  pText_(slide, highlight, 292, 389, 178, 12,
-    { font: 'Merriweather', size: 8, italic: true, bold: true, color: '#b1d26c' });
-  pText_(slide, tail, 460, 389, 220, 12,
-    { font: 'Merriweather', size: 8, color: '#dbeedc' });
-}
-
-/* Refined Poster A section drawers override the earlier versions above. */
 function posterA_drawHeader_(slide, submission, studentName) {
   pRect_(slide, 0, 0, 720, 405, POSTER_A.bg, POSTER_A.bg, 0, false);
   pRect_(slide, 6, 4, 708, 397, '#08261d', '#124d41', 1, true);
@@ -1260,7 +1645,7 @@ function posterA_drawEcologyCol_(slide, submission) {
   pRect_(slide, 300, 142, 5, 24, '#1a8d86', null, 0, true);
   pText_(slide, 'ECOSYSTEM ROLE', 314, 142, 134, 12,
     { font: 'Montserrat', size: 7, bold: true, color: '#12656a' });
-  pText_(slide, clipText_(roleText, 138), 314, 155, 134, 23,
+  pText_(slide, posterDisplayText_(roleText, 138), 314, 155, 134, 23,
     { font: 'Lato', size: 7, color: POSTER_A.body });
 
   pDotDivider_(slide, 314, 190, 118, '#79bac2', 2, 5);
@@ -1268,7 +1653,7 @@ function posterA_drawEcologyCol_(slide, submission) {
   pRect_(slide, 300, 202, 5, 24, '#1a8d86', null, 0, true);
   pText_(slide, 'ECOLOGICAL EXPLANATION', 314, 200, 136, 12,
     { font: 'Montserrat', size: 7, bold: true, color: '#12656a' });
-  pText_(slide, clipText_(submission.ecology_explanation, 138), 314, 217, 134, 29,
+  pText_(slide, posterDisplayText_(submission.ecology_explanation, 138), 314, 217, 134, 29,
     { font: 'Lato', size: 7, color: POSTER_A.body });
 }
 
@@ -1287,7 +1672,7 @@ function posterA_drawThreatsCol_(slide, submission) {
   pRect_(slide, 498, 142, 6, 24, '#e46e58', null, 0, true);
   pText_(slide, 'THREAT 1 - ' + posterThreatLabelShort_(t1), 514, 142, 166, 12,
     { font: 'Montserrat', size: 7, bold: true, color: '#c53e31' });
-  pText_(slide, clipText_(submission.threat_1_reason, 138), 514, 156, 166, 28,
+  pText_(slide, posterDisplayText_(submission.threat_1_reason, 138), 514, 156, 166, 28,
     { font: 'Lato', size: 7, color: '#4a2b26' });
 
   pDotDivider_(slide, 514, 194, 146, '#f0aa97', 2, 5);
@@ -1295,7 +1680,7 @@ function posterA_drawThreatsCol_(slide, submission) {
   pRect_(slide, 498, 206, 6, 24, '#e46e58', null, 0, true);
   pText_(slide, 'THREAT 2 - ' + posterThreatLabelShort_(t2), 514, 206, 166, 12,
     { font: 'Montserrat', size: 7, bold: true, color: '#c53e31' });
-  pText_(slide, clipText_(submission.threat_2_reason, 118), 514, 220, 166, 24,
+  pText_(slide, posterDisplayText_(submission.threat_2_reason, 118), 514, 220, 166, 24,
     { font: 'Lato', size: 7, color: '#4a2b26' });
 }
 
@@ -1344,7 +1729,7 @@ function posterA_drawWhyMatters_(slide, submission) {
 
   pRect_(slide, 486, 302, 206, 62, '#f8fbf3', '#9fc297', 1, true);
   pRect_(slide, 498, 314, 6, 34, '#5b8a55', null, 0, true);
-  pText_(slide, clipText_(trim_(submission.why_it_matters) || '', 160), 514, 314, 168, 34,
+  pText_(slide, posterDisplayText_(trim_(submission.why_it_matters) || '', 160), 514, 314, 168, 34,
     { font: 'Lato', size: 7, color: '#28412a' });
 }
 
@@ -1367,191 +1752,13 @@ function posterA_drawFooter_(slide, submission) {
     { font: 'Merriweather', size: 7, color: '#dbeedc' });
 }
 
-/* ===== Product B tile section drawers ===== */
-
-function tileA_draw_(slide, submission, studentName) {
-  var bg = hexToRgb_('#0d1f14');
-  slide.getBackground().setSolidFill(bg.r, bg.g, bg.b);
-
-  pRect_(slide, 0, 0, 720, 5, '#2e7d5b', null, 0, false);
-  pRect_(slide, 0, 5, 720, 22, '#153324', null, 0, false);
-  pText_(slide, 'ENDANGERED SPECIES RESCUE', 0, 9, 720, 14,
-    { font: 'Arial', size: 8, bold: true, color: '#81c784', align: SlidesApp.ParagraphAlignment.CENTER });
-
-  pText_(slide, submission.common_name || '', 0, 26, 720, 32,
-    { font: 'Georgia', size: 22, bold: true, color: '#ffffff', align: SlidesApp.ParagraphAlignment.CENTER });
-  pText_(slide, submission.scientific_name || '', 0, 59, 720, 16,
-    { font: 'Georgia', size: 9, italic: true, color: '#81c784', align: SlidesApp.ParagraphAlignment.CENTER });
-
-  var status = trim_(submission.identified_status) || 'Endangered';
-  pRect_(slide, 300, 77, 120, 16, '#c62828', null, 0, true);
-  pText_(slide, status.toUpperCase(), 300, 77, 120, 16,
-    { font: 'Arial', size: 8, bold: true, color: '#ffcdd2', align: SlidesApp.ParagraphAlignment.CENTER });
-
-  pLine_(slide, 10, 99, 700, '#c62828');
-  pText_(slide, 'THREATS', 0, 102, 720, 14,
-    { font: 'Arial', size: 8, bold: true, color: '#ef9a9a', align: SlidesApp.ParagraphAlignment.CENTER });
-
-  var t1 = trim_(submission.threat_1) || 'Threat 1';
-  pRect_(slide, 10, 119, 700, 80, '#2d0e0e', '#c62828', 1, true);
-  pText_(slide, 'THREAT 1 \u2014 ' + t1.toUpperCase(), 18, 121, 684, 14,
-    { font: 'Arial', size: 8, bold: true, color: '#ef5350' });
-  pText_(slide, trim_(submission.threat_1_reason) || '', 18, 136, 684, 60,
-    { font: 'Arial', size: 8, color: '#ffcdd2' });
-
-  var t2 = trim_(submission.threat_2) || 'Threat 2';
-  pRect_(slide, 10, 204, 700, 80, '#2d0e0e', '#c62828', 1, true);
-  pText_(slide, 'THREAT 2 \u2014 ' + t2.toUpperCase(), 18, 206, 684, 14,
-    { font: 'Arial', size: 8, bold: true, color: '#ef5350' });
-  pText_(slide, trim_(submission.threat_2_reason) || '', 18, 221, 684, 60,
-    { font: 'Arial', size: 8, color: '#ffcdd2' });
-
-  pText_(slide, studentName, 0, 370, 720, 14,
-    { font: 'Arial', size: 8, color: '#a5d6a7', align: SlidesApp.ParagraphAlignment.CENTER });
-  pRect_(slide, 0, 390, 720, 5, '#2e7d5b', null, 0, false);
-}
-
-function tileB_draw_(slide, submission) {
-  var bg = hexToRgb_('#0d1826');
-  slide.getBackground().setSolidFill(bg.r, bg.g, bg.b);
-
-  pRect_(slide, 0, 0, 720, 5, '#1565c0', null, 0, false);
-  pRect_(slide, 0, 5, 720, 22, '#1a3a5c', null, 0, false);
-  pText_(slide, 'ECOLOGY', 0, 9, 720, 14,
-    { font: 'Arial', size: 9, bold: true, color: '#90caf9', align: SlidesApp.ParagraphAlignment.CENTER });
-  pLine_(slide, 10, 28, 700, '#1565c0');
-
-  var rows = [
-    ['Habitat', submission.habitat_type || '\u2014'],
-    ['Diet', submission.diet_type || '\u2014'],
-    ['Key Adaptation', submission.adaptation_type || '\u2014'],
-    ['Ecosystem Role', submission.ecosystem_role || '\u2014']
-  ];
-  var ry = 36;
-  for (var ri = 0; ri < rows.length; ri++) {
-    pText_(slide, rows[ri][0], 20, ry, 340, 13, { font: 'Arial', size: 8, bold: true, color: '#64b5f6' });
-    pText_(slide, rows[ri][1], 20, ry + 13, 680, 13, { font: 'Arial', size: 8, color: '#bbdefb' });
-    ry += 30;
-  }
-
-  pLine_(slide, 10, ry + 2, 700, '#1565c0');
-  pText_(slide, 'Ecological Explanation', 20, ry + 6, 680, 13,
-    { font: 'Arial', size: 8, bold: true, color: '#64b5f6' });
-  pText_(slide, trim_(submission.ecology_explanation) || '', 20, ry + 20, 680, 80,
-    { font: 'Arial', size: 8, italic: true, color: '#90caf9' });
-
-  pRect_(slide, 0, 390, 720, 5, '#1565c0', null, 0, false);
-}
-
-function tileC_draw_(slide, submission, imageUrl) {
-  var bg = hexToRgb_('#0a1a10');
-  slide.getBackground().setSolidFill(bg.r, bg.g, bg.b);
-
-  pRect_(slide, 0, 0, 720, 5, '#2e7d5b', null, 0, false);
-  pRect_(slide, 8, 10, 704, 280, '#071410', '#2e7d5b', 1, true);
-
-  if (imageUrl) {
-    try {
-      insertSlideImageIntoBox_(slide, imageUrl, 8, 10, 704, 280);
-    } catch (imgErr) {
-      Logger.log('tileC image insert failed: ' + imgErr);
-    }
-  }
-
-  pLine_(slide, 8, 294, 704, '#2e7d5b');
-  pText_(slide, submission.common_name || '', 0, 299, 720, 22,
-    { font: 'Georgia', size: 13, bold: true, color: '#ffffff', align: SlidesApp.ParagraphAlignment.CENTER });
-  pText_(slide, submission.scientific_name || '', 0, 322, 720, 14,
-    { font: 'Georgia', size: 9, italic: true, color: '#81c784', align: SlidesApp.ParagraphAlignment.CENTER });
-  var status = trim_(submission.identified_status) || 'Endangered';
-  pText_(slide, 'Conservation Status: ' + status.toUpperCase(), 0, 337, 720, 14,
-    { font: 'Arial', size: 8, color: '#a5d6a7', align: SlidesApp.ParagraphAlignment.CENTER });
-  pRect_(slide, 0, 390, 720, 5, '#2e7d5b', null, 0, false);
-}
-
-function tileD_draw_(slide, submission) {
-  var bg = hexToRgb_('#160d26');
-  slide.getBackground().setSolidFill(bg.r, bg.g, bg.b);
-
-  pRect_(slide, 0, 0, 720, 5, '#7b1fa2', null, 0, false);
-  pRect_(slide, 0, 5, 720, 22, '#2e1f4a', null, 0, false);
-  pText_(slide, 'CONSERVATION ACTIONS', 0, 9, 720, 14,
-    { font: 'Arial', size: 9, bold: true, color: '#ce93d8', align: SlidesApp.ParagraphAlignment.CENTER });
-  pLine_(slide, 10, 28, 700, '#7b1fa2');
-
-  pRect_(slide, 10, 34, 700, 22, '#2a0f40', '#7b1fa2', 1, true);
-  pText_(slide, trim_(submission.action_1) || '', 10, 34, 700, 22,
-    { font: 'Arial', size: 9, bold: true, color: '#e1bee7', align: SlidesApp.ParagraphAlignment.CENTER });
-  pRect_(slide, 10, 61, 700, 22, '#2a0f40', '#7b1fa2', 1, true);
-  pText_(slide, trim_(submission.action_2) || '', 10, 61, 700, 22,
-    { font: 'Arial', size: 9, bold: true, color: '#e1bee7', align: SlidesApp.ParagraphAlignment.CENTER });
-
-  pLine_(slide, 10, 90, 700, '#7b1fa2');
-  pText_(slide, 'How They Help', 20, 94, 680, 13,
-    { font: 'Arial', size: 8, bold: true, color: '#ba68c8' });
-  pText_(slide, trim_(submission.action_explanation) || '', 20, 108, 680, 80,
-    { font: 'Arial', size: 8, color: '#e1bee7' });
-
-  pRect_(slide, 0, 390, 720, 5, '#7b1fa2', null, 0, false);
-}
-
-function tileE_draw_(slide, submission, studentName) {
-  var bg = hexToRgb_('#0d1f14');
-  slide.getBackground().setSolidFill(bg.r, bg.g, bg.b);
-
-  pRect_(slide, 0, 0, 720, 5, '#2e7d5b', null, 0, false);
-  pRect_(slide, 0, 5, 720, 22, '#1e3d23', null, 0, false);
-  pText_(slide, 'WHY THIS SPECIES MATTERS', 0, 9, 720, 14,
-    { font: 'Arial', size: 9, bold: true, color: '#a5d6a7', align: SlidesApp.ParagraphAlignment.CENTER });
-  pLine_(slide, 10, 28, 700, '#2e7d5b');
-
-  pText_(slide, '\u201c', 20, 34, 40, 36, { font: 'Georgia', size: 30, color: '#2e7d5b' });
-  pText_(slide, trim_(submission.why_it_matters) || '', 30, 44, 660, 130,
-    { font: 'Georgia', size: 9, italic: true, color: '#c8e6c9' });
-  pText_(slide, '\u201d', 660, 160, 40, 36, { font: 'Georgia', size: 30, color: '#2e7d5b' });
-
-  pLine_(slide, 10, 300, 700, '#2e7d5b');
-  pText_(slide, 'student-authored', 0, 305, 720, 13,
-    { font: 'Arial', size: 8, italic: true, color: '#81c784', align: SlidesApp.ParagraphAlignment.CENTER });
-  pText_(slide, studentName, 0, 320, 720, 14,
-    { font: 'Arial', size: 9, color: '#a5d6a7', align: SlidesApp.ParagraphAlignment.CENTER });
-  pRect_(slide, 0, 390, 720, 5, '#2e7d5b', null, 0, false);
-}
-
-/* ===== Product B builder ===== */
-
-function buildTilePdf_(outputFolder, baseName, submission) {
-  var pres = SlidesApp.create(baseName + ' - Wall Tiles');
-  var file = DriveApp.getFileById(pres.getId());
-  var studentName = ([submission.first_name || '', submission.last_name || '']).join(' ').trim();
-  var imageUrl = pickBestPosterImageUrl_(submission);
-
-  var slides = pres.getSlides();
-  while (slides.length < 5) { pres.appendSlide(); slides = pres.getSlides(); }
-
-  var clearSlide = function(s) {
-    var els = s.getPageElements();
-    for (var i = els.length - 1; i >= 0; i--) { try { els[i].remove(); } catch (e) {} }
-  };
-  for (var si = 0; si < 5; si++) { clearSlide(slides[si]); }
-
-  try { tileA_draw_(slides[0], submission, studentName); } catch (e) { Logger.log('tileA failed: ' + e); }
-  try { tileB_draw_(slides[1], submission); } catch (e) { Logger.log('tileB failed: ' + e); }
-  try { tileC_draw_(slides[2], submission, imageUrl); } catch (e) { Logger.log('tileC failed: ' + e); }
-  try { tileD_draw_(slides[3], submission); } catch (e) { Logger.log('tileD failed: ' + e); }
-  try { tileE_draw_(slides[4], submission, studentName); } catch (e) { Logger.log('tileE failed: ' + e); }
-
-  pres.saveAndClose();
-  try { outputFolder.addFile(file); } catch (e) {}
-  try { DriveApp.getRootFolder().removeFile(file); } catch (e) {}
-  return { file: file, warning: '' };
-}
-
 /* ===== Poster generation ===== */
 
 function generatePosterForSubmission_(submission) {
   var settings = getSettingsMap_();
   var warnings = [];
+  var shareWithLink = isTrueSetting_(settings.share_output_with_link);
+  var showStudentLinks = isTrueSetting_(settings.show_student_output_links);
 
   var folderResult = getOutputFolderSafe_(settings.output_folder_id);
   var outputFolder = folderResult.folder;
@@ -1562,7 +1769,17 @@ function generatePosterForSubmission_(submission) {
 
   var posterFile = null;
   var buildResult = null;
-  var templateId = settings.poster_template_file_id;
+  var templateId = '';
+  try {
+    templateId = ensurePolishedPosterTemplate_(settings, outputFolder);
+    settings.poster_template_file_id = templateId;
+    settings.poster_render_mode = 'template';
+    settings.use_template_poster = 'TRUE';
+  } catch (templateSetupError) {
+    Logger.log('Poster template setup failed. Fallback renderer will be used. ' + templateSetupError);
+    warnings.push('Poster template setup failed, so a fallback poster was created.');
+    templateId = trim_(settings.poster_template_file_id);
+  }
   var canUseTemplate = shouldUseTemplatePoster_(settings, templateId);
 
   if (canUseTemplate) {
@@ -1593,20 +1810,31 @@ function generatePosterForSubmission_(submission) {
   }
 
   try {
-    posterFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    if (pdfFile) pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    if (pdfFile && shareWithLink) {
+      pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    }
   } catch (shareError) {
     Logger.log('Sharing update failed: ' + shareError);
   }
 
+  if (pdfFile) archiveInternalPosterSlide_(posterFile);
+
   return {
-    slideUrl: posterFile.getUrl(),
+    slideUrl: '',
     pdfUrl: pdfFile ? pdfFile.getUrl() : '',
     posterFileId: posterFile.getId(),
     pdfFileId: pdfFile ? pdfFile.getId() : '',
     warning: warnings.join(' '),
-    studentCanViewFiles: !!pdfFile
+    studentCanViewFiles: !!(pdfFile && shareWithLink && showStudentLinks)
   };
+}
+
+function archiveInternalPosterSlide_(posterFile) {
+  try {
+    posterFile.setTrashed(true);
+  } catch (trashError) {
+    Logger.log('Could not trash internal poster slide after PDF export: ' + trashError);
+  }
 }
 
 function buildPosterFromTemplate_(templateId, outputFolder, posterName, submission) {
@@ -1616,37 +1844,22 @@ function buildPosterFromTemplate_(templateId, outputFolder, posterName, submissi
   var slides = presentation.getSlides();
 
   if (!slides || !slides.length) throw new Error('Poster template has no slides.');
-
-  var habitatEcologyText =
-    (submission.habitat_type || '') + '\n' +
-    (submission.diet_type || '') + '\n' +
-    (submission.adaptation_type || '') + '\n' +
-    (submission.ecosystem_role || '') + '\n\n' +
-    (submission.ecology_explanation || '');
-
-  var majorThreatsText =
-    '1. ' + (submission.threat_1 || '') + ': ' + (submission.threat_1_reason || '') + '\n\n' +
-    '2. ' + (submission.threat_2 || '') + ': ' + (submission.threat_2_reason || '');
-
-  var actionLines = [];
-  if (submission.action_1) actionLines.push('1. ' + submission.action_1);
-  if (submission.action_2) actionLines.push((actionLines.length + 1) + '. ' + submission.action_2);
-  var conservationActionsText = actionLines.join('\n') + '\n\n' + (submission.action_explanation || '');
-
-  var replacements = {
-    '{{STUDENT_NAME}}': [submission.first_name, submission.last_name].join(' ').trim(),
-    '{{HOUR}}': submission.hour || '',
-    '{{COMMON_NAME}}': submission.common_name || '',
-    '{{SCIENTIFIC_NAME}}': submission.scientific_name || '',
-    '{{HABITAT_ECOLOGY}}': habitatEcologyText,
-    '{{MAJOR_THREATS}}': majorThreatsText,
-    '{{CONSERVATION_ACTIONS}}': conservationActionsText,
-    '{{WHY_IT_MATTERS}}': submission.why_it_matters || ''
-  };
+  var replacements = buildPosterTemplateReplacements_(submission);
 
   for (var placeholder in replacements) {
     if (replacements.hasOwnProperty(placeholder)) {
       presentation.replaceAllText(placeholder, replacements[placeholder]);
+    }
+  }
+
+  var imageUrl = pickBestPosterImageUrl_(submission);
+  if (imageUrl) {
+    try {
+      if (!replaceTemplateImagePlaceholder_(slides[0], imageUrl)) {
+        insertSlideImageFromUrl_(slides[0], imageUrl);
+      }
+    } catch (imageErr) {
+      Logger.log('Template image placement failed: ' + imageErr);
     }
   }
 
@@ -2366,35 +2579,34 @@ function ensureSheetHeaders_(ss, sheetName, headers) {
 
   var existingHeaders = getHeaders_(sheet);
   var changed = false;
+  var hasDataRows = sheet.getLastRow() > 1;
 
-  if (existingHeaders.length > headers.length) {
-    if (sheet.getLastRow() > 1) {
-      throw new Error('Sheet "' + sheetName + '" has extra columns. Remove or rename them manually before continuing.');
-    }
+  if (!hasDataRows) {
     sheet.clearContents();
     sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
     existingHeaders = headers.slice();
     changed = true;
-  }
+  } else {
+    var existingHeaderMap = {};
+    for (var h = 0; h < existingHeaders.length; h++) {
+      var existingHeader = trim_(existingHeaders[h]);
+      if (existingHeader && !existingHeaderMap[existingHeader]) existingHeaderMap[existingHeader] = h + 1;
+    }
 
-  for (var i = 0; i < headers.length; i++) {
-    if (existingHeaders[i] === headers[i]) continue;
-    if (i >= existingHeaders.length) {
-      sheet.getRange(1, i + 1).setValue(headers[i]);
-      existingHeaders.push(headers[i]);
+    for (var i = 0; i < headers.length; i++) {
+      if (existingHeaderMap[headers[i]]) continue;
+
+      // Existing class data is more important than perfect column order.
+      // Add any newly required headers to the right instead of renaming or deleting old columns.
+      var newColumn = sheet.getLastColumn() + 1;
+      sheet.getRange(1, newColumn).setValue(headers[i]);
+      existingHeaderMap[headers[i]] = newColumn;
       changed = true;
-      continue;
     }
-    if (sheet.getLastRow() > 1) {
-      throw new Error('Sheet "' + sheetName + '" already has data and a header does not match. Fix headers manually.');
-    }
-    sheet.getRange(1, i + 1).setValue(headers[i]);
-    existingHeaders[i] = headers[i];
-    changed = true;
   }
 
   sheet.setFrozenRows(1);
-  autoResizeColumns_(sheet, headers.length);
+  autoResizeColumns_(sheet, sheet.getLastColumn());
   if (changed) SpreadsheetApp.flush();
   return sheet;
 }

@@ -38,6 +38,7 @@
 
   function wireButtons() {
     document.getElementById('startMissionBtn').addEventListener('click', handleStartMission);
+    document.getElementById('clearSavedMissionBtn').addEventListener('click', handleClearSavedMission);
     document.getElementById('briefingContinueBtn').addEventListener('click', function () {
       saveAnswersForStage('briefing');
       showStage('ecology');
@@ -706,14 +707,12 @@
 
   function populateLinkContainer(container, species) {
     container.innerHTML = '';
-    var researchLinks = [species.research_link_1, species.research_link_2];
-    for (var i = 0; i < researchLinks.length; i++) {
-      if (!researchLinks[i]) continue;
+    if (species.research_link_1) {
       var a = document.createElement('a');
-      a.href = researchLinks[i];
+      a.href = species.research_link_1;
       a.target = '_blank';
       a.rel = 'noopener noreferrer';
-      a.textContent = 'Research Link ' + (i + 1);
+      a.textContent = 'Start Here: Recommended Research Link';
       container.appendChild(a);
     }
     var googleUrl = 'https://www.google.com/search?q=' + encodeURIComponent((species.common_name || '') + ' endangered species conservation');
@@ -721,7 +720,7 @@
     googleLink.href = googleUrl;
     googleLink.target = '_blank';
     googleLink.rel = 'noopener noreferrer';
-    googleLink.textContent = 'Search for more sources';
+    googleLink.textContent = 'Search Google for more information';
     container.appendChild(googleLink);
   }
 
@@ -818,7 +817,7 @@
       return;
     }
     state.generatingPoster = true;
-    showSuccess('<span class="spinner"></span>Please wait, making your MASTERPIECE!');
+    showSuccess('<span class="spinner"></span>Creating your rescue report PDF...');
     document.getElementById('finishMissionBtn').disabled = true;
 
     google.script.run
@@ -874,7 +873,7 @@
         document.getElementById('emergencySubmitBtn').disabled = false;
         handleError(error);
       })
-      .emergencySubmitMission(state.studentKey);
+      .emergencySubmitMission(state.studentKey, collectFieldValues(), state.selectedImageUrl || '');
   }
 
   /* ===== Submission result handling ===== */
@@ -1045,7 +1044,8 @@
       action1: getValue('action1'),
       action2: getValue('action2'),
       actionExplanation: getValue('actionExplanation'),
-      whyItMatters: getValue('whyItMatters')
+      whyItMatters: getValue('whyItMatters'),
+      selectedImageUrl: state.selectedImageUrl || ''
     };
   }
 
@@ -1065,6 +1065,13 @@
 
   function clearDraftState() {
     try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+  }
+
+  function handleClearSavedMission() {
+    var confirmed = window.confirm('Clear the saved mission on this device? This only clears the local draft on this iPad/browser.');
+    if (!confirmed) return;
+    clearDraftState();
+    window.location.reload();
   }
 
   /* ===== Utilities ===== */
