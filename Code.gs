@@ -1748,7 +1748,7 @@ function posterHtmlCss_() {
     '.threat-land{background:linear-gradient(12deg,#ef5c40 0%,#ef5c40 54%,transparent 55%);}',
     '.help-land{background:linear-gradient(170deg,transparent 0%,transparent 28%,#82b53a 29%,#5f962c 100%);}',
     '.mountain-strip{position:absolute;left:0;right:0;bottom:0;height:.68in;background:linear-gradient(135deg,transparent 0 34%,rgba(15,103,169,.22) 35% 50%,transparent 51%),linear-gradient(155deg,transparent 0 46%,rgba(15,103,169,.35) 47% 66%,transparent 67%),linear-gradient(180deg,transparent 0%,rgba(15,150,164,.35) 100%);}',
-    '.why-strip{height:.66in;background:linear-gradient(150deg,transparent 0 28%,rgba(15,103,169,.22) 29% 44%,transparent 45%),linear-gradient(165deg,transparent 0 48%,rgba(15,103,169,.35) 49% 68%,transparent 69%),linear-gradient(180deg,transparent 0%,rgba(15,103,169,.18) 100%);}',
+    '.why-strip{height:.44in;background:linear-gradient(150deg,transparent 0 28%,rgba(15,103,169,.20) 29% 44%,transparent 45%),linear-gradient(165deg,transparent 0 48%,rgba(15,103,169,.30) 49% 68%,transparent 69%),linear-gradient(180deg,transparent 0%,rgba(15,103,169,.16) 100%);}',
     '.poster-footer{position:absolute;z-index:20;left:0;top:10.34in;width:8.5in;height:.66in;box-sizing:border-box;background:', POSTER_HTML_V1.footer, ';border-top:6px solid #7acbd8;color:#fff;text-align:center;line-height:.57in;font-size:28px;font-weight:800;letter-spacing:1px;}',
     '.poster-footer svg{width:.34in;height:.34in;vertical-align:middle;}',
     '.footer-paws{position:absolute;right:.34in;top:.15in;letter-spacing:0;line-height:1;}',
@@ -1835,7 +1835,7 @@ function posterBulletText_(text, maxChars, fallback) {
 
 function buildPosterWhyItMattersText_(submission, commonName) {
   var fallback = 'Protecting ' + commonName.toLowerCase() + ' helps keep ecosystems healthy and balanced.';
-  return posterDisplayText_(trim_(submission.why_it_matters) || fallback, 112);
+  return posterDisplayText_(trim_(submission.why_it_matters) || fallback, 92);
 }
 
 function posterHtmlSpeciesTitleSize_(commonName) {
