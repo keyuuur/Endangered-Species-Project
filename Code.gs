@@ -1743,7 +1743,7 @@ function posterHtmlCss_() {
     '.why-card .dot-rule{color:', POSTER_HTML_V1.blue, ';}',
     'ul{position:relative;z-index:2;margin:.06in .26in 0 .38in;padding:0;text-align:left;font-size:18px;line-height:1.34;}',
     'li{margin:0 0 .18in 0;padding-left:.02in;}',
-    '.why-card p{padding:.05in .3in 0;font-size:16.5px;}',
+    '.why-card p{padding:.04in .34in 0;font-size:15.5px;line-height:1.22;max-height:1.28in;overflow:hidden;}',
     '.card-land{position:absolute;left:0;right:0;bottom:0;height:.58in;border-radius:0 0 22px 22px;opacity:.95;}',
     '.threat-land{background:linear-gradient(12deg,#ef5c40 0%,#ef5c40 54%,transparent 55%);}',
     '.help-land{background:linear-gradient(170deg,transparent 0%,transparent 28%,#82b53a 29%,#5f962c 100%);}',
@@ -1835,7 +1835,7 @@ function posterBulletText_(text, maxChars, fallback) {
 
 function buildPosterWhyItMattersText_(submission, commonName) {
   var fallback = 'Protecting ' + commonName.toLowerCase() + ' helps keep ecosystems healthy and balanced.';
-  return posterDisplayText_(trim_(submission.why_it_matters) || fallback, 142);
+  return posterDisplayText_(trim_(submission.why_it_matters) || fallback, 112);
 }
 
 function posterHtmlSpeciesTitleSize_(commonName) {
