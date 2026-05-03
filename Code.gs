@@ -1835,7 +1835,15 @@ function posterBulletText_(text, maxChars, fallback) {
 
 function buildPosterWhyItMattersText_(submission, commonName) {
   var fallback = 'Protecting ' + commonName.toLowerCase() + ' helps keep ecosystems healthy and balanced.';
-  return posterDisplayText_(trim_(submission.why_it_matters) || fallback, 92);
+  var studentText = trim_(submission.why_it_matters);
+  if (studentText && studentText.length <= 92) return studentText;
+
+  var habitat = trim_(submission.habitat_type || submission.biome || 'ecosystems').toLowerCase();
+  if (habitat.indexOf('/') !== -1) habitat = trim_(habitat.split('/')[0]);
+  return posterDisplayText_(
+    'Protecting ' + commonName.toLowerCase() + ' helps protect ' + habitat + ' habitats and other wildlife.',
+    92
+  ) || fallback;
 }
 
 function posterHtmlSpeciesTitleSize_(commonName) {
