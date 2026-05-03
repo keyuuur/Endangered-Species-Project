@@ -1794,7 +1794,7 @@ function getPortraitPosterDisplayData_(submission) {
   var status = trim_(submission.identified_status) || trim_(submission.status) || (species && species.status) || 'Add conservation status here';
   var biome = trim_(submission.biome) || trim_(submission.habitat_type) || (species && species.biome) || '';
   var region = (species && species.region) || '';
-  var imageUrl = pickBestPosterImageUrl_(submission);
+  var imageUrls = getPosterImageCandidateUrls_(submission, species);
 
   return {
     commonName: commonName,
@@ -1804,7 +1804,7 @@ function getPortraitPosterDisplayData_(submission) {
     threats: buildExactlyTwoThreats_(submission),
     actions: buildExactlyTwoActions_(submission),
     whyItMatters: buildPosterWhyItMattersText_(submission, commonName),
-    imageDataUri: getPosterImageDataUri_(imageUrl, commonName)
+    imageDataUri: getPosterImageDataUriFromCandidates_(imageUrls, commonName)
   };
 }
 
@@ -1856,16 +1856,47 @@ function posterHtmlSpeciesTitleSize_(commonName) {
 }
 
 function getPosterImageDataUri_(imageUrl, commonName) {
-  var text = trim_(imageUrl);
-  if (/^data:image\//i.test(text) && !shouldBackfillImageValue_(text)) return text;
+  return getPosterImageDataUriFromCandidates_([imageUrl], commonName);
+}
 
-  var blob = getImageBlobFromSource_(text);
-  if (blob) {
-    var contentType = trim_(blob.getContentType() || '') || 'image/jpeg';
-    return 'data:' + contentType + ';base64,' + Utilities.base64Encode(blob.getBytes());
+function getPosterImageDataUriFromCandidates_(imageUrls, commonName) {
+  var candidates = imageUrls || [];
+  for (var i = 0; i < candidates.length; i++) {
+    var text = trim_(candidates[i]);
+    if (!text || shouldBackfillImageValue_(text)) continue;
+    if (/^data:image\//i.test(text)) return text;
+
+    var blob = getImageBlobFromSource_(text);
+    if (blob) {
+      var contentType = trim_(blob.getContentType() || '') || 'image/jpeg';
+      return 'data:' + contentType + ';base64,' + Utilities.base64Encode(blob.getBytes());
+    }
   }
 
   return createPosterHeroPlaceholderDataUri_(commonName);
+}
+
+function getPosterImageCandidateUrls_(submission, species) {
+  var seen = {};
+  var candidates = [];
+
+  function addCandidate(url) {
+    var text = trim_(url);
+    if (!isUsableSpeciesImageUrl_(text)) return;
+    var key = normalizeImageUrlForBrowser_(text) || text;
+    if (seen[key]) return;
+    seen[key] = true;
+    candidates.push(text);
+  }
+
+  addCandidate(submission.selected_image_url);
+  var speciesRow = species || (submission.species_id ? findSpeciesById_(submission.species_id) : null);
+  if (speciesRow) {
+    addCandidate(speciesRow.image_option_1_url);
+    addCandidate(speciesRow.image_option_2_url);
+    addCandidate(speciesRow.image_option_3_url);
+  }
+  return candidates;
 }
 
 function createPosterHeroPlaceholderDataUri_(label) {
