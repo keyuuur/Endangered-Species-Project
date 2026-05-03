@@ -240,6 +240,59 @@ function runThreeEndToEndTests() {
   return results;
 }
 
+function testPortraitPoster_AllSpecies_() {
+  ensureProjectReady_();
+  var speciesList = getDefaultSpeciesCatalog_();
+  var results = [];
+  for (var i = 0; i < speciesList.length; i++) {
+    var s = speciesList[i];
+    var fake = {
+      first_name: 'Portrait',
+      last_name: 'Test',
+      hour: '1',
+      species_id: s.species_id,
+      common_name: s.common_name,
+      scientific_name: s.scientific_name,
+      biome: s.biome,
+      identified_status: s.status,
+      habitat_type: s.habitat_hint || s.biome,
+      diet_type: s.diet_hint || '',
+      ecosystem_role: s.ecosystem_role_hint || '',
+      threat_1: 'Habitat loss',
+      threat_2: 'Climate change',
+      action_1: 'Protect habitats',
+      action_2: 'Support conservation groups',
+      why_it_matters: s.common_name + ' plays an important role in its ecosystem and helps keep nature balanced.',
+      selected_image_url: s.image_option_1_url || ''
+    };
+    var out = generatePosterForSubmission_(fake);
+    results.push({ species: s.common_name, pdfUrl: out.pdfUrl, warning: out.warning });
+    Logger.log(s.common_name + ': ' + JSON.stringify(out));
+  }
+  return results;
+}
+
+function testPortraitPoster_LongText_() {
+  ensureProjectReady_();
+  var fake = {
+    first_name: 'Long',
+    last_name: 'Name',
+    hour: '2',
+    species_id: 'african-forest-elephant',
+    common_name: 'African Forest Elephant',
+    scientific_name: 'Loxodonta cyclotis',
+    biome: 'Tropical forest',
+    identified_status: 'Critically Endangered',
+    habitat_type: 'Rainforest',
+    threat_1: 'Habitat loss from expanding farms and roads',
+    threat_2: 'Poaching and illegal ivory trade',
+    action_1: 'Protect forest habitat corridors',
+    action_2: 'Support anti-poaching patrols',
+    why_it_matters: 'African forest elephants spread seeds and help maintain healthy tropical forests that support many other species.'
+  };
+  return generatePosterForSubmission_(fake);
+}
+
 function shuffleArray_(items) {
   for (var i = items.length - 1; i > 0; i--) {
     var j = Math.floor(Math.random() * (i + 1));
@@ -378,10 +431,10 @@ function setupProjectSheets() {
     ['show_student_output_links', 'TRUE'],
     ['e2e_test_key', ''],
     ['allow_e2e_endpoint', 'FALSE'],
-    ['poster_template_version', 'template_first_v1'],
-    ['use_template_poster', 'TRUE'],
-    // Poster renderer: "template" is the production path; "fallback_v2" is the safety net.
-    ['poster_render_mode', 'template']
+    ['poster_template_version', 'html_portrait_v1'],
+    ['use_template_poster', 'FALSE'],
+    // Poster renderer: "html_portrait_v1" is the production path; old Slides renderers remain safety nets.
+    ['poster_render_mode', 'html_portrait_v1']
   ];
 
   ensureSheetHeaders_(ss, APP.sheetNames.species, speciesHeaders);
@@ -410,6 +463,7 @@ function ensureProjectReady_() {
   setupProjectSheets();
   seedDefaultSpeciesMasterIfNeeded_();
   patchMissingSpeciesImageData_();
+  migratePosterRenderSettings_();
 }
 
 function runSetupHealthCheck() {
@@ -468,10 +522,14 @@ function runSetupHealthCheck() {
   }
 
   try {
+    var posterMode = normalizePosterRenderMode_(settings);
     var useTemplate = isTrueSetting_(settings.use_template_poster);
     var templateId = trim_(settings.poster_template_file_id);
-    if (!useTemplate) {
-      addCheck('Poster template', true, 'Template mode is off; fallback renderer will be used.');
+    addCheck('Poster renderer', true, 'Current render mode: ' + posterMode);
+    if (posterMode === 'html_portrait_v1') {
+      addCheck('Poster template', true, 'Portrait HTML-to-PDF renderer does not require a Slides template.');
+    } else if (!useTemplate) {
+      addCheck('Poster template', true, 'Template mode is off; fallback Slides renderer will be used.');
     } else if (!hasConfiguredDriveId_(templateId)) {
       addCheck('Poster template', false, 'Template mode is on, but no valid template ID is configured.');
     } else {
@@ -1442,6 +1500,36 @@ function setSettingValue_(key, value) {
   SpreadsheetApp.flush();
 }
 
+function normalizePosterRenderMode_(settings) {
+  var mode = trim_(settings && settings.poster_render_mode).toLowerCase();
+  if (!mode) return 'html_portrait_v1';
+  if (mode === 'portrait_template_v1') return 'html_portrait_v1';
+  return mode;
+}
+
+function migratePosterRenderSettings_() {
+  var settings = getSettingsMap_();
+  var mode = normalizePosterRenderMode_(settings);
+
+  // The older template renderer was useful while we were iterating, but the
+  // classroom-ready target is now the portrait HTML-to-PDF poster.
+  if (mode === 'html_portrait_v1') {
+    if (trim_(settings.poster_template_version) !== 'html_portrait_v1') {
+      setSettingValue_('poster_template_version', 'html_portrait_v1');
+    }
+    if (isTrueSetting_(settings.use_template_poster)) {
+      setSettingValue_('use_template_poster', 'FALSE');
+    }
+    return;
+  }
+
+  if (mode === 'template' || mode === 'fallback_v2') {
+    setSettingValue_('poster_render_mode', 'html_portrait_v1');
+    setSettingValue_('poster_template_version', 'html_portrait_v1');
+    setSettingValue_('use_template_poster', 'FALSE');
+  }
+}
+
 function ensurePolishedPosterTemplate_(settings, outputFolder) {
   var configuredId = trim_(settings.poster_template_file_id);
   var expectedVersion = 'template_first_v1';
@@ -1499,6 +1587,347 @@ function posterDisplayText_(text, maxChars) {
   var wordCut = clean.lastIndexOf(' ', maxChars - 3);
   if (wordCut < Math.floor(maxChars * 0.55)) wordCut = maxChars - 3;
   return clean.substring(0, wordCut).trim() + '...';
+}
+
+var POSTER_HTML_V1 = {
+  bg: '#FFFFFF',
+  bgWarm: '#FBFEFC',
+  navy: '#0B2A5B',
+  teal: '#1596A4',
+  tealDark: '#0D7F8C',
+  tealLight: '#CFEFF5',
+  green: '#3E7E2D',
+  greenDark: '#2F6E24',
+  greenLight: '#F3FAEC',
+  coral: '#F05A3E',
+  coralDark: '#D94930',
+  coralLight: '#FFF0EC',
+  blue: '#0F67A9',
+  blueDark: '#0A4E86',
+  blueLight: '#EEF8FF',
+  body: '#1E2A32',
+  muted: '#5E6B73',
+  paleLine: '#D8E8E5',
+  footer: '#078D9B',
+  footerDark: '#057986',
+  yellow: '#FF9F1C'
+};
+
+function buildHtmlPortraitPoster_(outputFolder, posterName, submission) {
+  var html = buildPortraitPosterHtml_(submission);
+  var htmlBlob = Utilities.newBlob(html, 'text/html', posterName + '.html');
+  var pdfBlob = htmlBlob.getAs(MimeType.PDF).setName(posterName + '.pdf');
+  var pdfFile = outputFolder.createFile(pdfBlob);
+  return { pdfFile: pdfFile, warning: '' };
+}
+
+function buildPortraitPosterHtml_(submission) {
+  var data = getPortraitPosterDisplayData_(submission);
+  var css = posterHtmlCss_();
+  var titleSize = posterHtmlSpeciesTitleSize_(data.commonName);
+
+  return [
+    '<!doctype html>',
+    '<html>',
+    '<head>',
+    '<meta charset="UTF-8">',
+    '<style>', css, '</style>',
+    '</head>',
+    '<body>',
+    '<main class="poster" aria-label="Endangered Species Rescue Mission poster">',
+      posterHtmlDecorations_(),
+      '<section class="header">',
+        '<div class="save-title">SAVE THE</div>',
+        '<div class="species-title" style="font-size:', titleSize, 'px;">', escapeHtml_(data.commonName.toUpperCase()), '</div>',
+        '<div class="scientific-ribbon"><span>', escapeHtml_(data.scientificName), '</span></div>',
+      '</section>',
+      '<section class="hero-frame">',
+        '<img class="hero-img" src="', escapeHtml_(data.imageDataUri), '" alt="', escapeHtml_(data.commonName), '">',
+        '<div class="hero-grass hero-grass-left"></div>',
+        '<div class="hero-grass hero-grass-right"></div>',
+      '</section>',
+      '<section class="card status-card">',
+        posterHtmlIconCircle_('shield'),
+        '<h2>STATUS</h2>',
+        '<div class="mini-rule"></div>',
+        '<p class="center-text">', posterHtmlLines_(data.status), '</p>',
+      '</section>',
+      '<section class="card biome-card">',
+        posterHtmlIconCircle_('globe'),
+        '<h2>BIOME &amp; REGION</h2>',
+        '<div class="mini-rule"></div>',
+        '<p class="center-text">', posterHtmlLines_(data.biomeRegion), '</p>',
+        '<div class="mountain-strip blue-strip"></div>',
+      '</section>',
+      '<section class="card bottom-card threats-card">',
+        posterHtmlIconCircle_('alert'),
+        '<h2>THREATS</h2>',
+        '<div class="dot-rule"></div>',
+        posterHtmlBulletList_(data.threats),
+        '<div class="card-land threat-land"></div>',
+      '</section>',
+      '<section class="card bottom-card help-card">',
+        posterHtmlIconCircle_('hands-leaf'),
+        '<h2>HOW WE CAN HELP</h2>',
+        '<div class="dot-rule"></div>',
+        posterHtmlBulletList_(data.actions),
+        '<div class="card-land help-land"></div>',
+      '</section>',
+      '<section class="card bottom-card why-card">',
+        posterHtmlIconCircle_('heart'),
+        '<h2>WHY IT MATTERS</h2>',
+        '<div class="dot-rule"></div>',
+        '<p>', escapeHtml_(data.whyItMatters), '</p>',
+        '<div class="mountain-strip why-strip"></div>',
+      '</section>',
+      '<footer class="poster-footer">',
+        '<span class="footer-leaf">', posterHtmlIconSvg_('leaf'), '</span>',
+        '<span>Endangered Species Rescue Mission</span>',
+        '<span class="footer-paws">', posterHtmlIconSvg_('paw'), posterHtmlIconSvg_('paw'), '</span>',
+      '</footer>',
+    '</main>',
+    '</body>',
+    '</html>'
+  ].join('');
+}
+
+function posterHtmlCss_() {
+  return [
+    '@page{size:8.5in 11in;margin:0;}',
+    'html,body{margin:0;padding:0;background:#fff;}',
+    'body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}',
+    '.poster{position:relative;width:8.5in;height:11in;overflow:hidden;background:linear-gradient(180deg,#fff 0%,#fbfefc 72%,#eef9fb 100%);font-family:Arial,Helvetica,sans-serif;color:', POSTER_HTML_V1.body, ';}',
+    '.header{position:absolute;left:.25in;top:.2in;width:8in;height:1.55in;text-align:center;}',
+    '.save-title{font-weight:900;font-size:38px;letter-spacing:3px;color:', POSTER_HTML_V1.navy, ';line-height:1;text-shadow:0 2px 0 rgba(11,42,91,.08);}',
+    '.species-title{font-weight:900;letter-spacing:2px;color:', POSTER_HTML_V1.teal, ';line-height:1.05;margin-top:8px;text-shadow:0 2px 0 rgba(21,150,164,.12);}',
+    '.scientific-ribbon{position:absolute;left:2.45in;top:1.08in;width:3.6in;height:.42in;background:', POSTER_HTML_V1.teal, ';border:3px solid ', POSTER_HTML_V1.tealDark, ';border-radius:10px;box-shadow:0 3px 0 rgba(13,127,140,.18);}',
+    '.scientific-ribbon:before,.scientific-ribbon:after{content:"";position:absolute;top:7px;border-top:13px solid transparent;border-bottom:13px solid transparent;}',
+    '.scientific-ribbon:before{left:-22px;border-right:22px solid ', POSTER_HTML_V1.tealDark, ';}',
+    '.scientific-ribbon:after{right:-22px;border-left:22px solid ', POSTER_HTML_V1.tealDark, ';}',
+    '.scientific-ribbon span{display:block;color:#fff;font-family:Georgia,serif;font-style:italic;font-weight:700;font-size:23px;line-height:.42in;text-align:center;}',
+    '.hero-frame{position:absolute;left:.25in;top:2.05in;width:5.15in;height:4.35in;border:8px solid #73c8d6;border-radius:38px;background:', POSTER_HTML_V1.tealLight, ';overflow:hidden;box-shadow:0 8px 18px rgba(13,127,140,.15);}',
+    '.hero-img{width:100%;height:100%;object-fit:cover;display:block;}',
+    '.hero-frame:after{content:"";position:absolute;inset:0;border:4px solid rgba(255,255,255,.78);border-radius:29px;pointer-events:none;}',
+    '.hero-grass{position:absolute;bottom:-18px;width:1.45in;height:.62in;background:#82b53a;border-radius:48% 52% 0 0;opacity:.98;}',
+    '.hero-grass-left{left:-.1in;box-shadow:.28in -.04in 0 -.09in #5f962c,.55in .03in 0 -.08in #9bc64a;}',
+    '.hero-grass-right{right:-.08in;box-shadow:-.28in -.08in 0 -.1in #5f962c,-.58in .02in 0 -.08in #9bc64a;}',
+    '.card{position:absolute;border-radius:28px;border:4px solid;background:#fff;box-sizing:border-box;box-shadow:0 6px 14px rgba(55,91,105,.10);overflow:hidden;text-align:center;}',
+    '.card h2{position:relative;z-index:2;margin:0;font-weight:900;letter-spacing:1px;line-height:1.05;}',
+    '.card p{position:relative;z-index:2;margin:0;font-size:17px;line-height:1.32;color:', POSTER_HTML_V1.body, ';}',
+    '.status-card{left:5.75in;top:2.2in;width:2.5in;height:1.62in;background:', POSTER_HTML_V1.greenLight, ';border-color:#9abd75;}',
+    '.status-card h2{font-size:27px;color:', POSTER_HTML_V1.greenDark, ';margin-top:.74in;}',
+    '.status-card p{padding:.05in .24in 0;}',
+    '.biome-card{left:5.75in;top:4.08in;width:2.5in;height:2.32in;background:', POSTER_HTML_V1.blueLight, ';border-color:#73c8d6;}',
+    '.biome-card h2{font-size:24px;color:', POSTER_HTML_V1.teal, ';margin-top:.76in;}',
+    '.biome-card p{padding:.08in .2in 0;}',
+    '.bottom-card{top:6.72in;width:2.52in;height:3.16in;}',
+    '.threats-card{left:.25in;background:', POSTER_HTML_V1.coralLight, ';border-color:#ff806a;}',
+    '.help-card{left:3in;background:', POSTER_HTML_V1.greenLight, ';border-color:#8ab95d;}',
+    '.why-card{left:5.75in;background:', POSTER_HTML_V1.blueLight, ';border-color:#6ea9d8;}',
+    '.threats-card h2{font-size:28px;color:', POSTER_HTML_V1.coralDark, ';margin-top:.72in;}',
+    '.help-card h2{font-size:21px;color:', POSTER_HTML_V1.greenDark, ';margin-top:.72in;}',
+    '.why-card h2{font-size:22px;color:', POSTER_HTML_V1.blueDark, ';margin-top:.72in;}',
+    '.icon-circle{position:absolute;z-index:3;left:50%;top:.18in;transform:translateX(-50%);width:.58in;height:.58in;border-radius:999px;background:#fff;border:3px solid currentColor;display:flex;align-items:center;justify-content:center;}',
+    '.icon-circle svg{width:.38in;height:.38in;}',
+    '.status-card .icon-circle{color:', POSTER_HTML_V1.greenDark, ';}',
+    '.biome-card .icon-circle{color:', POSTER_HTML_V1.teal, ';}',
+    '.threats-card .icon-circle{color:', POSTER_HTML_V1.coralDark, ';}',
+    '.help-card .icon-circle{color:', POSTER_HTML_V1.greenDark, ';}',
+    '.why-card .icon-circle{color:', POSTER_HTML_V1.blueDark, ';}',
+    '.mini-rule{position:relative;z-index:2;width:.54in;height:4px;margin:.08in auto .08in;border-radius:4px;background:currentColor;}',
+    '.status-card .mini-rule{color:', POSTER_HTML_V1.greenDark, ';}',
+    '.biome-card .mini-rule{color:', POSTER_HTML_V1.teal, ';}',
+    '.dot-rule{position:relative;z-index:2;width:1.62in;margin:.12in auto .18in;border-top:6px dotted currentColor;}',
+    '.threats-card .dot-rule{color:', POSTER_HTML_V1.coral, ';}',
+    '.help-card .dot-rule{color:', POSTER_HTML_V1.green, ';}',
+    '.why-card .dot-rule{color:', POSTER_HTML_V1.blue, ';}',
+    'ul{position:relative;z-index:2;margin:.06in .26in 0 .38in;padding:0;text-align:left;font-size:18px;line-height:1.34;}',
+    'li{margin:0 0 .18in 0;padding-left:.02in;}',
+    '.why-card p{padding:.05in .3in 0;font-size:16.5px;}',
+    '.card-land{position:absolute;left:0;right:0;bottom:0;height:.58in;border-radius:0 0 22px 22px;opacity:.95;}',
+    '.threat-land{background:linear-gradient(12deg,#ef5c40 0%,#ef5c40 54%,transparent 55%);}',
+    '.help-land{background:linear-gradient(170deg,transparent 0%,transparent 28%,#82b53a 29%,#5f962c 100%);}',
+    '.mountain-strip{position:absolute;left:0;right:0;bottom:0;height:.68in;background:linear-gradient(135deg,transparent 0 34%,rgba(15,103,169,.22) 35% 50%,transparent 51%),linear-gradient(155deg,transparent 0 46%,rgba(15,103,169,.35) 47% 66%,transparent 67%),linear-gradient(180deg,transparent 0%,rgba(15,150,164,.35) 100%);}',
+    '.why-strip{height:.66in;background:linear-gradient(150deg,transparent 0 28%,rgba(15,103,169,.22) 29% 44%,transparent 45%),linear-gradient(165deg,transparent 0 48%,rgba(15,103,169,.35) 49% 68%,transparent 69%),linear-gradient(180deg,transparent 0%,rgba(15,103,169,.18) 100%);}',
+    '.poster-footer{position:absolute;left:0;bottom:0;width:8.5in;height:.58in;background:', POSTER_HTML_V1.footer, ';border-top:6px solid #7acbd8;color:#fff;display:flex;align-items:center;justify-content:center;gap:.24in;font-size:28px;font-weight:800;letter-spacing:1px;}',
+    '.poster-footer svg{width:.36in;height:.36in;}',
+    '.footer-paws{display:flex;gap:.08in;position:absolute;right:.34in;top:.12in;}',
+    '.footer-leaf{position:absolute;left:.34in;top:.12in;}',
+    '.sun{position:absolute;right:1.26in;top:.35in;width:.42in;height:.42in;border-radius:50%;background:', POSTER_HTML_V1.yellow, ';box-shadow:0 0 0 7px rgba(255,159,28,.08);}',
+    '.sun:before{content:"";position:absolute;left:-.18in;right:-.18in;top:.19in;border-top:5px dotted ', POSTER_HTML_V1.yellow, ';}',
+    '.cloud{position:absolute;background:#cfe7f4;border-radius:999px;opacity:.86;}',
+    '.cloud:before,.cloud:after{content:"";position:absolute;background:#cfe7f4;border-radius:999px;}',
+    '.cloud-left{left:.25in;top:1.55in;width:.92in;height:.24in;}',
+    '.cloud-left:before{left:.2in;top:-.18in;width:.42in;height:.42in;}',
+    '.cloud-left:after{right:.1in;top:-.08in;width:.33in;height:.33in;}',
+    '.cloud-right{right:.5in;top:1.95in;width:.92in;height:.24in;}',
+    '.cloud-right:before{left:.14in;top:-.18in;width:.42in;height:.42in;}',
+    '.cloud-right:after{right:.1in;top:-.1in;width:.34in;height:.34in;}',
+    '.leaf-sprig{position:absolute;color:#5c9c45;opacity:.95;}',
+    '.leaf-sprig svg{width:.8in;height:.8in;}',
+    '.leaf-left{left:.62in;top:.45in;transform:rotate(-28deg);}',
+    '.leaf-right{right:.62in;top:.98in;transform:rotate(34deg);}',
+    '.accent{position:absolute;width:.46in;height:.08in;background:#4aa8df;border-radius:999px;opacity:.85;}',
+    '.accent.a1{left:2.45in;top:.55in;transform:rotate(20deg);}',
+    '.accent.a2{left:2.38in;top:.86in;transform:rotate(-6deg);}',
+    '.accent.a3{right:2.38in;top:.56in;transform:rotate(-32deg);}',
+    '.accent.a4{right:2.25in;top:.88in;transform:rotate(10deg);}',
+    '.center-text{text-align:center;}'
+  ].join('');
+}
+
+function posterHtmlDecorations_() {
+  return [
+    '<div class="sun"></div>',
+    '<div class="cloud cloud-left"></div>',
+    '<div class="cloud cloud-right"></div>',
+    '<div class="leaf-sprig leaf-left">', posterHtmlIconSvg_('leaf-sprig'), '</div>',
+    '<div class="leaf-sprig leaf-right">', posterHtmlIconSvg_('leaf-sprig'), '</div>',
+    '<div class="accent a1"></div><div class="accent a2"></div><div class="accent a3"></div><div class="accent a4"></div>'
+  ].join('');
+}
+
+function getPortraitPosterDisplayData_(submission) {
+  var species = submission.species_id ? findSpeciesById_(submission.species_id) : null;
+  var commonName = trim_(submission.common_name) || trim_(submission.identified_common_name) || (species && species.common_name) || 'Species Name';
+  var scientificName = trim_(submission.scientific_name) || trim_(submission.identified_scientific_name) || (species && species.scientific_name) || 'Scientific Name';
+  var status = trim_(submission.identified_status) || trim_(submission.status) || (species && species.status) || 'Add conservation status here';
+  var biome = trim_(submission.biome) || trim_(submission.habitat_type) || (species && species.biome) || '';
+  var region = (species && species.region) || '';
+  var imageUrl = pickBestPosterImageUrl_(submission);
+
+  return {
+    commonName: commonName,
+    scientificName: scientificName,
+    status: posterDisplayText_(status, 48),
+    biomeRegion: buildPosterBiomeRegionText_(biome, region),
+    threats: buildExactlyTwoThreats_(submission),
+    actions: buildExactlyTwoActions_(submission),
+    whyItMatters: buildPosterWhyItMattersText_(submission, commonName),
+    imageDataUri: getPosterImageDataUri_(imageUrl, commonName)
+  };
+}
+
+function buildPosterBiomeRegionText_(biome, region) {
+  var b = posterDisplayText_(biome, 42);
+  var r = posterDisplayText_(region, 58);
+  if (b && r && b.toLowerCase() !== r.toLowerCase()) return b + '\n' + r;
+  return b || r || 'Add biome and region here';
+}
+
+function buildExactlyTwoThreats_(submission) {
+  return [
+    posterBulletText_(submission.threat_1, 52, 'Threat 1'),
+    posterBulletText_(submission.threat_2, 52, 'Threat 2')
+  ];
+}
+
+function buildExactlyTwoActions_(submission) {
+  return [
+    posterBulletText_(submission.action_1, 52, 'Action 1'),
+    posterBulletText_(submission.action_2, 52, 'Action 2')
+  ];
+}
+
+function posterBulletText_(text, maxChars, fallback) {
+  return posterDisplayText_(trim_(text) || fallback, maxChars);
+}
+
+function buildPosterWhyItMattersText_(submission, commonName) {
+  var fallback = 'Protecting ' + commonName.toLowerCase() + ' helps keep ecosystems healthy and balanced.';
+  return posterDisplayText_(trim_(submission.why_it_matters) || fallback, 142);
+}
+
+function posterHtmlSpeciesTitleSize_(commonName) {
+  var len = trim_(commonName).length;
+  if (len <= 10) return 58;
+  if (len <= 16) return 52;
+  if (len <= 22) return 46;
+  if (len <= 30) return 39;
+  return 34;
+}
+
+function getPosterImageDataUri_(imageUrl, commonName) {
+  var text = trim_(imageUrl);
+  if (/^data:image\//i.test(text) && !shouldBackfillImageValue_(text)) return text;
+
+  var blob = getImageBlobFromSource_(text);
+  if (blob) {
+    var contentType = trim_(blob.getContentType() || '') || 'image/jpeg';
+    return 'data:' + contentType + ';base64,' + Utilities.base64Encode(blob.getBytes());
+  }
+
+  return createPosterHeroPlaceholderDataUri_(commonName);
+}
+
+function createPosterHeroPlaceholderDataUri_(label) {
+  var safeLabel = String(label || 'Species')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="760" viewBox="0 0 1000 760">' +
+    '<defs><linearGradient id="sky" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#cfeff8"/><stop offset="1" stop-color="#edf9fb"/></linearGradient></defs>' +
+    '<rect width="1000" height="760" fill="url(#sky)"/>' +
+    '<circle cx="820" cy="120" r="58" fill="#ffb347" opacity=".8"/>' +
+    '<path d="M0 430 190 250 350 415 520 220 760 450 1000 250v510H0Z" fill="#8ebbd5" opacity=".72"/>' +
+    '<path d="M0 520 230 335 470 545 670 380 1000 545v215H0Z" fill="#5f9dbc" opacity=".74"/>' +
+    '<path d="M0 615c110-40 220-52 330-30s210 28 335 2c130-28 232-12 335 30v143H0Z" fill="#6aa84f"/>' +
+    '<rect x="360" y="270" width="280" height="190" rx="22" fill="#ffffff" opacity=".82"/>' +
+    '<text x="500" y="350" text-anchor="middle" font-family="Arial" font-size="44" font-weight="700" fill="#0d7f8c">ORGANISM IMAGE</text>' +
+    '<text x="500" y="410" text-anchor="middle" font-family="Arial" font-size="30" fill="#2f6e24">' + safeLabel + '</text>' +
+    '</svg>';
+  return 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(svg);
+}
+
+function posterHtmlIconCircle_(type) {
+  return '<div class="icon-circle">' + posterHtmlIconSvg_(type) + '</div>';
+}
+
+function posterHtmlIconSvg_(type) {
+  var common = '<svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+  var end = '</svg>';
+  switch (type) {
+    case 'shield':
+      return common + '<path d="M32 8 50 15v14c0 13-7 23-18 28-11-5-18-15-18-28V15l18-7Z"/><circle cx="24" cy="32" r="4" fill="currentColor" stroke="none"/><circle cx="32" cy="27" r="4" fill="currentColor" stroke="none"/><circle cx="40" cy="32" r="4" fill="currentColor" stroke="none"/><path d="M22 44c3-8 17-8 20 0" fill="currentColor" stroke="none"/></svg>';
+    case 'globe':
+      return common + '<circle cx="32" cy="32" r="22"/><path d="M10 32h44"/><path d="M32 10c8 8 8 36 0 44"/><path d="M32 10c-8 8-8 36 0 44"/><path d="M17 19c8 5 22 5 30 0"/><path d="M17 45c8-5 22-5 30 0"/>' + end;
+    case 'alert':
+      return common + '<path d="M32 9 56 53H8L32 9Z"/><path d="M32 24v14"/><circle cx="32" cy="46" r="2.5" fill="currentColor" stroke="none"/>' + end;
+    case 'hands-leaf':
+      return common + '<path d="M18 42c7 8 21 8 28 0"/><path d="M15 38c6 1 10 5 13 10"/><path d="M49 38c-6 1-10 5-13 10"/><path d="M32 36c-4-9 2-19 13-22-1 12-5 18-13 22Z" fill="currentColor" stroke="none"/><path d="M32 36c-5-5-10-8-16-8 3 8 8 11 16 8Z" fill="currentColor" stroke="none"/>' + end;
+    case 'heart':
+      return common + '<path d="M32 53 13 34c-6-6-6-16 0-21 6-5 14-5 19 1 5-6 13-6 19-1 6 5 6 15 0 21L32 53Z" fill="currentColor" stroke="none"/>' + end;
+    case 'leaf':
+      return common + '<path d="M48 14C31 14 18 24 16 44c17 4 31-5 34-30Z" fill="currentColor" stroke="none"/><path d="M18 44c10-9 18-15 29-25" stroke="#fff" stroke-width="3"/>' + end;
+    case 'leaf-sprig':
+      return common + '<path d="M14 54c16-14 27-28 36-44"/><ellipse cx="22" cy="42" rx="8" ry="13" transform="rotate(-44 22 42)" fill="currentColor" stroke="none"/><ellipse cx="30" cy="31" rx="8" ry="13" transform="rotate(-38 30 31)" fill="currentColor" stroke="none"/><ellipse cx="39" cy="20" rx="8" ry="13" transform="rotate(-32 39 20)" fill="currentColor" stroke="none"/>' + end;
+    case 'paw':
+      return common + '<circle cx="20" cy="24" r="5" fill="currentColor" stroke="none"/><circle cx="31" cy="18" r="5" fill="currentColor" stroke="none"/><circle cx="42" cy="24" r="5" fill="currentColor" stroke="none"/><path d="M19 45c4-13 22-13 26 0 1 5-5 8-12 5-7 3-15 0-14-5Z" fill="currentColor" stroke="none"/>' + end;
+    default:
+      return common + '<circle cx="32" cy="32" r="20"/>' + end;
+  }
+}
+
+function posterHtmlBulletList_(items) {
+  var out = ['<ul>'];
+  for (var i = 0; i < 2; i++) {
+    out.push('<li>', escapeHtml_(items[i] || ''), '</li>');
+  }
+  out.push('</ul>');
+  return out.join('');
+}
+
+function posterHtmlLines_(text) {
+  return escapeHtml_(text).replace(/\n/g, '<br>');
+}
+
+function escapeHtml_(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function getPosterFactPack_(submission) {
@@ -1768,21 +2197,38 @@ function generatePosterForSubmission_(submission) {
   var posterName = sanitizeFileName_(['Rescue Poster', submission.common_name || 'Species', studentName || 'Student'].join(' - '));
 
   var posterFile = null;
+  var pdfFile = null;
   var buildResult = null;
-  var templateId = '';
-  try {
-    templateId = ensurePolishedPosterTemplate_(settings, outputFolder);
-    settings.poster_template_file_id = templateId;
-    settings.poster_render_mode = 'template';
-    settings.use_template_poster = 'TRUE';
-  } catch (templateSetupError) {
-    Logger.log('Poster template setup failed. Fallback renderer will be used. ' + templateSetupError);
-    warnings.push('Poster template setup failed, so a fallback poster was created.');
-    templateId = trim_(settings.poster_template_file_id);
-  }
-  var canUseTemplate = shouldUseTemplatePoster_(settings, templateId);
+  var renderMode = normalizePosterRenderMode_(settings);
 
-  if (canUseTemplate) {
+  if (renderMode === 'html_portrait_v1') {
+    try {
+      buildResult = buildHtmlPortraitPoster_(outputFolder, posterName, submission);
+      pdfFile = buildResult.pdfFile;
+      if (buildResult.warning) warnings.push(buildResult.warning);
+    } catch (htmlPosterError) {
+      Logger.log('Portrait HTML poster build failed. Falling back to Slides renderer. ' + htmlPosterError);
+      warnings.push('Portrait poster failed, so a fallback poster was created.');
+    }
+  }
+
+  var templateId = '';
+  var canUseTemplate = false;
+  if (!pdfFile) {
+    try {
+      templateId = ensurePolishedPosterTemplate_(settings, outputFolder);
+      settings.poster_template_file_id = templateId;
+      settings.poster_render_mode = 'template';
+      settings.use_template_poster = 'TRUE';
+    } catch (templateSetupError) {
+      Logger.log('Poster template setup failed. Fallback renderer will be used. ' + templateSetupError);
+      warnings.push('Poster template setup failed, so a fallback poster was created.');
+      templateId = trim_(settings.poster_template_file_id);
+    }
+    canUseTemplate = shouldUseTemplatePoster_(settings, templateId);
+  }
+
+  if (!pdfFile && canUseTemplate) {
     try {
       buildResult = buildPosterFromTemplate_(templateId, outputFolder, posterName, submission);
       posterFile = buildResult.file;
@@ -1793,20 +2239,21 @@ function generatePosterForSubmission_(submission) {
     }
   }
 
-  if (!posterFile) {
+  if (!pdfFile && !posterFile) {
     buildResult = buildFallbackPoster_(outputFolder, posterName, submission);
     posterFile = buildResult.file;
     if (buildResult.warning) warnings.push(buildResult.warning);
   }
 
-  if (!posterFile) throw new Error('Poster file could not be created.');
+  if (!pdfFile && !posterFile) throw new Error('Poster file could not be created.');
 
-  var pdfFile = null;
-  try {
-    pdfFile = exportSlidesFileAsPdfWithRetry_(posterFile.getId(), posterName, outputFolder);
-  } catch (pdfError) {
-    Logger.log('PDF export failed: ' + pdfError);
-    warnings.push('Poster was created, but PDF export failed.');
+  if (!pdfFile && posterFile) {
+    try {
+      pdfFile = exportSlidesFileAsPdfWithRetry_(posterFile.getId(), posterName, outputFolder);
+    } catch (pdfError) {
+      Logger.log('PDF export failed: ' + pdfError);
+      warnings.push('Poster was created, but PDF export failed.');
+    }
   }
 
   try {
@@ -1817,12 +2264,12 @@ function generatePosterForSubmission_(submission) {
     Logger.log('Sharing update failed: ' + shareError);
   }
 
-  if (pdfFile) archiveInternalPosterSlide_(posterFile);
+  if (pdfFile && posterFile) archiveInternalPosterSlide_(posterFile);
 
   return {
     slideUrl: '',
     pdfUrl: pdfFile ? pdfFile.getUrl() : '',
-    posterFileId: posterFile.getId(),
+    posterFileId: posterFile ? posterFile.getId() : '',
     pdfFileId: pdfFile ? pdfFile.getId() : '',
     warning: warnings.join(' '),
     studentCanViewFiles: !!(pdfFile && shareWithLink && showStudentLinks)
